@@ -7,16 +7,13 @@
 ## 💳 Tổng quan Tài sản & Tài khoản
 
 ```dataviewjs
+const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
+const SUPABASE_ANON_KEY = "yeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
+
 try {
-  let configText = await dv.io.load("vault/99_System/config.json");
-  if (!configText) configText = await dv.io.load("99_System/config.json");
-  if (!configText) throw new Error("Không tìm thấy file config.json trong vault");
-  
-  const config = JSON.parse(configText);
-  const url = config.SUPABASE_URL + "/rest/v1/accounts?select=id,name,type,current_balance,currency&order=name.asc";
-  
+  const url = SUPABASE_URL + "/rest/v1/accounts?select=id,name,type,current_balance,currency&order=name.asc";
   const res = await fetch(url, {
-    headers: { 'apikey': config.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}` }
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
   });
   
   if (res.ok) {
@@ -30,10 +27,10 @@ try {
       `${Number(a.current_balance).toLocaleString()} ${a.currency}`
     ]));
   } else {
-    dv.paragraph("⚠️ Không thể tải dữ liệu tài khoản từ Supabase (Mã lỗi HTTP " + res.status + ").");
+    dv.paragraph("⚠️ Không thể tải dữ liệu tài khoản từ Supabase. (HTTP " + res.status + ")");
   }
 } catch (err) {
-  dv.paragraph("❌ Lỗi kết nối: " + err.message);
+  dv.paragraph("❌ Lỗi kết nối Supabase: " + err.message);
 }
 ```
 
@@ -42,17 +39,15 @@ try {
 ## 🤝 Quản lý Nợ & Cho Vay (Debts)
 
 ```dataviewjs
+const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
+const SUPABASE_ANON_KEY = "yeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
+
 try {
-  let configText = await dv.io.load("vault/99_System/config.json");
-  if (!configText) configText = await dv.io.load("99_System/config.json");
-  if (!configText) throw new Error("Không tìm thấy file config.json trong vault");
-  
-  const config = JSON.parse(configText);
-  const headers = { 'apikey': config.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}` };
+  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
   
   const [debtsRes, peopleRes] = await Promise.all([
-    fetch(config.SUPABASE_URL + "/rest/v1/debts?select=*&status=in.(pending,partial)&order=occurred_at.asc", { headers }),
-    fetch(config.SUPABASE_URL + "/rest/v1/people?select=id,name", { headers })
+    fetch(SUPABASE_URL + "/rest/v1/debts?select=*&status=in.(pending,partial)&order=occurred_at.asc", { headers }),
+    fetch(SUPABASE_URL + "/rest/v1/people?select=id,name", { headers })
   ]);
   
   if (debtsRes.ok && peopleRes.ok) {
@@ -95,16 +90,13 @@ try {
 ## 🎁 Hoàn tiền Thẻ (Cashback Cycles)
 
 ```dataviewjs
+const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
+const SUPABASE_ANON_KEY = "yeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
+
 try {
-  let configText = await dv.io.load("vault/99_System/config.json");
-  if (!configText) configText = await dv.io.load("99_System/config.json");
-  if (!configText) throw new Error("Không tìm thấy file config.json trong vault");
-  
-  const config = JSON.parse(configText);
-  const url = config.SUPABASE_URL + "/rest/v1/cashback_cycles?select=*&status=eq.active&order=cycle_tag.desc";
-  
+  const url = SUPABASE_URL + "/rest/v1/cashback_cycles?select=*&status=eq.active&order=cycle_tag.desc";
   const res = await fetch(url, {
-    headers: { 'apikey': config.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}` }
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
   });
   
   if (res.ok) {
@@ -121,7 +113,7 @@ try {
       ]));
     }
   } else {
-    dv.paragraph("⚠️ Lỗi tải chu kỳ hoàn tiền từ Supabase.");
+    dv.paragraph("⚠️ Lỗi tải dữ liệu hoàn tiền từ Supabase.");
   }
 } catch (err) {
   dv.paragraph("❌ Lỗi kết nối: " + err.message);
