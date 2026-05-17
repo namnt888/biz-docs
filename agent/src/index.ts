@@ -157,12 +157,25 @@ export async function processDailyLog() {
     const { data: accounts } = await supabase
       .from('accounts')
       .select('id, name')
-      .ilike('name', `%${item.account_name}%`)
-      .limit(1);
+      .ilike('name', `%${item.account_name || 'Cash'}%`)
+      .limit(5);
 
     let accountId = null;
-    if (accounts && accounts.length > 0) {
+    let resolvedName = item.account_name || 'Cash';
+
+    if (accounts && accounts.length === 1) {
       accountId = accounts[0].id;
+      resolvedName = accounts[0].name;
+    } else if (accounts && accounts.length > 1) {
+      const exact = accounts.find(a => a.name.toLowerCase() === item.account_name?.toLowerCase());
+      if (exact) {
+        accountId = exact.id;
+        resolvedName = exact.name;
+      } else {
+        accountId = accounts[0].id;
+        resolvedName = accounts[0].name;
+        console.warn(`[!] Ambiguous account '${item.account_name}'. Multiple matches: ${accounts.map(a => a.name).join(', ')}. Auto-picked '${resolvedName}'.`);
+      }
     } else {
       console.log(`Account '${item.account_name}' not found. Creating dummy account...`);
       const { data: newAcc } = await supabase
