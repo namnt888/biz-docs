@@ -1,0 +1,91 @@
+{
+  "name": "Supabase to Google Sheets Sync (Obsidian Money)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "supabase-transaction-webhook",
+        "options": {}
+      },
+      "id": "e83e5828-5694-4d1a-85b4-d5395a14d5f0",
+      "name": "Webhook (Supabase Trigger)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [ 240, 300 ],
+      "webhookId": "obsidian-money-sync-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "sheetId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID_HERE",
+          "mode": "id"
+        },
+        "range": "Transactions!A:G",
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        },
+        "fields": {
+          "values": [
+            {
+              "column": "A",
+              "value": "={{ $json.body.record.occurred_at }}"
+            },
+            {
+              "column": "B",
+              "value": "={{ $json.body.record.type }}"
+            },
+            {
+              "column": "C",
+              "value": "={{ $json.body.record.amount }}"
+            },
+            {
+              "column": "D",
+              "value": "={{ $json.body.record.note }}"
+            },
+            {
+              "column": "E",
+              "value": "={{ $json.body.record.account_id }}"
+            },
+            {
+              "column": "F",
+              "value": "={{ $json.body.record.person_id || '' }}"
+            },
+            {
+              "column": "G",
+              "value": "={{ JSON.stringify($json.body.record.metadata) }}"
+            }
+          ]
+        }
+      },
+      "id": "8db34ec5-5682-4148-8df0-7690680a6538",
+      "name": "Google Sheets (Append Transaction)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [ 560, 300 ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook (Supabase Trigger)": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets (Append Transaction)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
