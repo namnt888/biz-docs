@@ -7,13 +7,13 @@
 ## 💳 Tổng quan Tài sản & Tài khoản
 
 ```dataviewjs
-const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
-
 try {
-  const url = SUPABASE_URL + "/rest/v1/accounts?select=id,name,type,current_balance,currency&order=name.asc";
+  const configText = await dv.io.load("99_System/config.json");
+  const config = JSON.parse(configText);
+  const url = config.SUPABASE_URL + "/rest/v1/accounts?select=id,name,type,current_balance,currency&order=name.asc";
+  
   const res = await fetch(url, {
-    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+    headers: { 'apikey': config.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}` }
   });
   
   if (res.ok) {
@@ -39,15 +39,14 @@ try {
 ## 🤝 Quản lý Nợ & Cho Vay (Debts)
 
 ```dataviewjs
-const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
-
 try {
-  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+  const configText = await dv.io.load("99_System/config.json");
+  const config = JSON.parse(configText);
+  const headers = { 'apikey': config.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}` };
   
   const [debtsRes, peopleRes] = await Promise.all([
-    fetch(SUPABASE_URL + "/rest/v1/debts?select=*&status=in.(pending,partial)&order=occurred_at.asc", { headers }),
-    fetch(SUPABASE_URL + "/rest/v1/people?select=id,name", { headers })
+    fetch(config.SUPABASE_URL + "/rest/v1/debts?select=*&status=in.(pending,partial)&order=occurred_at.asc", { headers }),
+    fetch(config.SUPABASE_URL + "/rest/v1/people?select=id,name", { headers })
   ]);
   
   if (debtsRes.ok && peopleRes.ok) {
@@ -90,13 +89,13 @@ try {
 ## 🎁 Hoàn tiền Thẻ (Cashback Cycles)
 
 ```dataviewjs
-const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
-
 try {
-  const url = SUPABASE_URL + "/rest/v1/cashback_cycles?select=*&status=eq.active&order=cycle_tag.desc";
+  const configText = await dv.io.load("99_System/config.json");
+  const config = JSON.parse(configText);
+  const url = config.SUPABASE_URL + "/rest/v1/cashback_cycles?select=*&status=eq.active&order=cycle_tag.desc";
+  
   const res = await fetch(url, {
-    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+    headers: { 'apikey': config.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}` }
   });
   
   if (res.ok) {
