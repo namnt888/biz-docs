@@ -4,8 +4,10 @@ node_modules/
 dist/
 build/
 
-# Obsidian specific
+# Obsidian workspace state (keeps plugin configs but ignores personal tab layouts)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache/
 vault/.obsidian/workspace.json
 vault/.obsidian/workspace-mobile.json
 vault/.obsidian/cache/
-vault/.trash/

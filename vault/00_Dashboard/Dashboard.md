@@ -8,7 +8,10 @@
 
 ```dataviewjs
 try {
-  const configText = await dv.io.load("99_System/config.json");
+  let configText = await dv.io.load("vault/99_System/config.json");
+  if (!configText) configText = await dv.io.load("99_System/config.json");
+  if (!configText) throw new Error("Không tìm thấy file config.json trong vault");
+  
   const config = JSON.parse(configText);
   const url = config.SUPABASE_URL + "/rest/v1/accounts?select=id,name,type,current_balance,currency&order=name.asc";
   
@@ -27,7 +30,7 @@ try {
       `${Number(a.current_balance).toLocaleString()} ${a.currency}`
     ]));
   } else {
-    dv.paragraph("⚠️ Không thể tải dữ liệu tài khoản từ Supabase.");
+    dv.paragraph("⚠️ Không thể tải dữ liệu tài khoản từ Supabase (Mã lỗi HTTP " + res.status + ").");
   }
 } catch (err) {
   dv.paragraph("❌ Lỗi kết nối: " + err.message);
@@ -40,7 +43,10 @@ try {
 
 ```dataviewjs
 try {
-  const configText = await dv.io.load("99_System/config.json");
+  let configText = await dv.io.load("vault/99_System/config.json");
+  if (!configText) configText = await dv.io.load("99_System/config.json");
+  if (!configText) throw new Error("Không tìm thấy file config.json trong vault");
+  
   const config = JSON.parse(configText);
   const headers = { 'apikey': config.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}` };
   
@@ -64,7 +70,6 @@ try {
         const repaid = Number(d.repaid_amount);
         const remain = Number(d.remaining_amount);
         
-        // Progress bar calculation
         const percent = Math.min(100, Math.round((repaid / orig) * 100));
         const barLength = 10;
         const filled = Math.round((percent / 100) * barLength);
@@ -77,6 +82,8 @@ try {
         ];
       }));
     }
+  } else {
+    dv.paragraph("⚠️ Lỗi tải dữ liệu nợ từ Supabase.");
   }
 } catch (err) {
   dv.paragraph("❌ Lỗi kết nối: " + err.message);
@@ -89,7 +96,10 @@ try {
 
 ```dataviewjs
 try {
-  const configText = await dv.io.load("99_System/config.json");
+  let configText = await dv.io.load("vault/99_System/config.json");
+  if (!configText) configText = await dv.io.load("99_System/config.json");
+  if (!configText) throw new Error("Không tìm thấy file config.json trong vault");
+  
   const config = JSON.parse(configText);
   const url = config.SUPABASE_URL + "/rest/v1/cashback_cycles?select=*&status=eq.active&order=cycle_tag.desc";
   
@@ -110,6 +120,8 @@ try {
         `${Number(c.cb_max_budget || 0).toLocaleString()} VND`
       ]));
     }
+  } else {
+    dv.paragraph("⚠️ Lỗi tải chu kỳ hoàn tiền từ Supabase.");
   }
 } catch (err) {
   dv.paragraph("❌ Lỗi kết nối: " + err.message);
