@@ -3,6 +3,8 @@
 > Write your natural language transactions here. The agent will parse them.
 > Example format: `- ăn sáng 45k Vpbank`
 
+**⚡ Bạn muốn nhập nhanh qua biểu mẫu HTML? [👉 Mở Quick Form](Quick_Entry.md)**
+
 ## Unsynced Transactions
 
 

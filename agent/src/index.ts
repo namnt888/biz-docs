@@ -42,7 +42,9 @@ Each transaction should conform strictly to the following JSON schema:
   "person_name": string (optional, if the transaction involves borrowing, lending, or paying a specific person, e.g., "Nam", "Hương"),
   "cashback_mode": string (optional: "none_back" | "percent" | "fixed" | "real_fixed" | "real_percent" | "voluntary"),
   "cashback_share_percent": number (optional, e.g., 0.5 for 50%),
-  "cashback_share_fixed": number (optional, integer amount)
+  "cashback_share_fixed": number (optional, integer amount),
+  "service_fee": number (optional, integer in VND if the note mentions fees/surcharges, e.g., "phí 50k" -> 50000),
+  "is_installment": boolean (optional, true if mentioned as installment/trả góp)
 }
 Return ONLY valid JSON array [ { ... } ]. Do not include markdown formatting or any explanations.
 `;
@@ -186,20 +188,34 @@ export async function processDailyLog() {
       }
     }
 
-    if (accountId) {
+      const occurredAt = item.occurred_at || new Date().toISOString();
+      const amt = item.amount || 0;
+      const fee = item.service_fee || 0;
+      const finalPrice = amt + fee;
+      const d = new Date(occurredAt);
+      const tag = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
       const { data: insertedTxn, error: insErr } = await supabase
         .from('transactions')
         .insert({
-          occurred_at: item.occurred_at || new Date().toISOString(),
+          occurred_at: occurredAt,
           type: item.type || 'expense',
-          amount: item.amount || 0,
+          amount: amt,
           note: item.note || '',
           account_id: accountId,
           person_id: personId,
           cashback_mode: item.cashback_mode || 'none_back',
           cashback_share_percent: item.cashback_share_percent,
           cashback_share_fixed: item.cashback_share_fixed,
-          metadata: { category_name: item.category_name },
+          metadata: {
+            category_name: item.category_name,
+            service_fee: fee,
+            final_price: finalPrice,
+            statement_cycle_tag: tag,
+            debt_cycle_tag: tag,
+            is_installment: item.is_installment || false,
+            created_via: 'AIDaemon'
+          },
         })
         .select()
         .single();
