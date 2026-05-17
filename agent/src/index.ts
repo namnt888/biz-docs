@@ -83,14 +83,20 @@ async function parseTransactionsWithAI(lines: string[]) {
 
 export async function processDailyLog() {
   const vaultPath = process.env.OBSIDIAN_VAULT_PATH || '../vault';
-  const todayFile = path.join(vaultPath, '01_Daily_Logs', 'Today.md');
+  const d = new Date();
+  const currentMonthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const monthlyFile = path.resolve(vaultPath, '01_Monthly_Logs', `${currentMonthStr}.md`);
   
-  if (!fs.existsSync(todayFile)) {
-    console.log(`No daily log found at ${todayFile}`);
-    return;
+  if (!fs.existsSync(monthlyFile)) {
+    console.log(`Creating new monthly log for ${currentMonthStr}...`);
+    const dir = path.dirname(monthlyFile);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    
+    const template = `# 📅 Ghi chép Chi tiêu Tháng ${d.getMonth() + 1}/${d.getFullYear()}\n\n> Ghi chép các khoản thu chi bằng văn bản tự nhiên dưới mục **Unsynced**.\n\n[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)\n\n---\n\n## Unsynced Transactions\n\n\n## Synced Transactions\n`;
+    fs.writeFileSync(monthlyFile, template, 'utf8');
   }
 
-  const content = fs.readFileSync(todayFile, 'utf8');
+  const content = fs.readFileSync(monthlyFile, 'utf8');
 
   const lines = content.split('\n');
   let isUnsyncedSection = false;
@@ -241,7 +247,6 @@ export async function processDailyLog() {
         await cashbackService.processTransactionCashback(payload);
         await debtService.processTransactionDebt(payload);
       }
-    }
   }
 
   const timestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -250,8 +255,8 @@ export async function processDailyLog() {
   }
 
   const newContent = [...headerLines, ...syncedLines, ...footerLines].join('\n');
-  fs.writeFileSync(todayFile, newContent, 'utf8');
-  console.log(`✅ Updated ${todayFile} with synced status!`);
+  fs.writeFileSync(monthlyFile, newContent, 'utf8');
+  console.log(`✅ Updated ${monthlyFile} with synced status!`);
 }
 
 // Only auto-run if executed directly via CLI

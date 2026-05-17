@@ -22,7 +22,7 @@
           "value": "YOUR_SPREADSHEET_ID_HERE",
           "mode": "id"
         },
-        "range": "Transactions!A:G",
+        "range": "Transactions!A:J",
         "options": {
           "valueInputOption": "USER_ENTERED"
         },
@@ -30,7 +30,7 @@
           "values": [
             {
               "column": "A",
-              "value": "={{ $json.body.record.occurred_at }}"
+              "value": "={{ $json.body.record.id }}"
             },
             {
               "column": "B",
@@ -38,23 +38,35 @@
             },
             {
               "column": "C",
-              "value": "={{ $json.body.record.amount }}"
+              "value": "={{ $json.body.record.occurred_at }}"
             },
             {
               "column": "D",
-              "value": "={{ $json.body.record.note }}"
+              "value": "={{ $json.body.record.metadata.shop_id || '' }}"
             },
             {
               "column": "E",
-              "value": "={{ $json.body.record.account_id }}"
+              "value": "={{ $json.body.record.note }}"
             },
             {
               "column": "F",
-              "value": "={{ $json.body.record.person_id || '' }}"
+              "value": "={{ $json.body.record.amount }}"
             },
             {
               "column": "G",
-              "value": "={{ JSON.stringify($json.body.record.metadata) }}"
+              "value": "={{ $json.body.record.cashback_share_percent || 0 }}"
+            },
+            {
+              "column": "H",
+              "value": "={{ $json.body.record.cashback_share_fixed || 0 }}"
+            },
+            {
+              "column": "I",
+              "value": "={{ $json.body.record.metadata.final_price || $json.body.record.amount }}"
+            },
+            {
+              "column": "J",
+              "value": "={{ $json.body.record.metadata.debt_cycle_tag || '' }}"
             }
           ]
         }

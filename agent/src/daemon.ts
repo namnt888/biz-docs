@@ -6,16 +6,16 @@ import { processDailyLog } from './index';
 dotenv.config();
 
 const vaultPath = process.env.OBSIDIAN_VAULT_PATH || '../vault';
-const todayFile = path.resolve(vaultPath, '01_Daily_Logs', 'Today.md');
+const monthlyLogsDir = path.resolve(vaultPath, '01_Monthly_Logs');
 
 console.log(`\n🤖 Obsidian Money Daemon initialized.`);
-console.log(`Watching for realtime changes on: ${todayFile}`);
+console.log(`Watching for realtime changes on directory: ${monthlyLogsDir}`);
 
 let isProcessing = false;
 let debounceTimer: NodeJS.Timeout | null = null;
 
-// Watch the specific file
-const watcher = chokidar.watch(todayFile, {
+// Watch all markdown files in monthly logs directory
+const watcher = chokidar.watch(path.join(monthlyLogsDir, '*.md'), {
   persistent: true,
   awaitWriteFinish: {
     stabilityThreshold: 1500, // wait 1.5s after typing stops before triggering
