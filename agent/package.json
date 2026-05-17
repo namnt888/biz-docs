@@ -1,0 +1,23 @@
+{
+  "name": "obsidian-money-agent",
+  "version": "1.0.0",
+  "description": "Agent to parse financial transactions from natural language and sync to Supabase",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.20.1",
+    "@supabase/supabase-js": "^2.43.1",
+    "@types/ws": "^8.18.1",
+    "dotenv": "^16.4.5",
+    "openai": "^6.38.0",
+    "ws": "^8.20.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.11",
+    "tsx": "^4.10.0",
+    "typescript": "^5.4.5"
+  }
+}
