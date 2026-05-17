@@ -1,36 +1,50 @@
-# 🤖 Agent Skills & Workflows (Obsidian Money)
+# 🧠 Agent Skills & Workflows (Obsidian Money)
 
-Tài liệu này định nghĩa các kỹ năng (skills), quy tắc nghiệp vụ (business rules) và luồng xử lý (workflows) dành cho bất kỳ AI Agent nào khi tham gia phát triển hoặc bảo trì repo `obsidian-money`.
-
----
-
-## 🛠️ Kỹ năng Hiện tại (Implemented Skills)
-
-### 1. Natural Language Transaction Parsing (`agent/src/index.ts`)
-- **Mục tiêu:** Chuyển đổi text tự nhiên thành dữ liệu JSON có cấu trúc.
-- **Khả năng tự động:** Tự đoán `account_name` (Vpbank, Techcombank, MoMo, Tiền mặt) và `category_name` (Ăn uống, Mua sắm, Di chuyển).
-- **Workaround Kỹ thuật:** Đã tích hợp thuật toán lọc bỏ các thẻ `<thinking>...</thinking>` của các dòng model tư duy (Claude 3.7 / 3.5), đảm bảo `JSON.parse()` không bị lỗi cú pháp.
-
-### 2. Auto Account Seeding
-- **Mục tiêu:** Khi giao dịch phát sinh trên một tài khoản mới chưa từng có trong DB Supabase, Agent tự động tạo mới record tài khoản đó với `type = cash` và `balance = 0` trước khi insert giao dịch.
-
-### 3. State Transition in Markdown
-- **Mục tiêu:** Quản lý vòng đời dữ liệu trực tiếp trên file text.
-- **Quy tắc:** Chỉ đọc dữ liệu từ mục `## Unsynced Transactions`. Sau khi xử lý xong, bắt buộc phải dọn sạch mục này và dán nhãn `[x]` chuyển sang `## Synced Transactions`.
+Tài liệu này lưu trữ các kỹ năng (skills) và quy tắc (guidelines) dành cho bất kỳ AI Agent nào làm việc trên repository này trong tương lai.
 
 ---
 
-## 🔮 Kỹ năng & Workflows Cần Mở Rộng (Future Skills)
+## Skill 1: Transaction Parsing & Cleanup (Natural Language -> SQL)
 
-### Workflow 1: N8N to Google Sheets Sync
-- **Trigger:** Webhook từ Supabase khi có bản ghi mới trong bảng `transactions` (`status = posted`).
-- **Action:** Gửi payload sang n8n -> Format dữ liệu -> Gọi node Google Sheets (Append Row).
-- **Yêu cầu AI Agent:** Khi phát triển tính năng này, cần xuất file JSON của workflow n8n và lưu vào thư mục `n8n/workflows/`.
+### Workflow
+1. Khi nhận nhiệm vụ xử lý giao dịch tự nhiên, luôn kiểm tra file `vault/01_Daily_Logs/Today.md`.
+2. Bóc tách phần text dưới header `## Unsynced Transactions`.
+3. Bắt buộc yêu cầu AI Gateway xuất ra mảng JSON theo chuẩn:
+   ```json
+   {
+     "occurred_at": "ISO-8601",
+     "type": "expense | income | transfer_in | transfer_out | debt | repayment",
+     "amount": number,
+     "note": string,
+     "account_name": string,
+     "category_name": string
+   }
+   ```
+4. **Xử lý đặc thù (Claude 3.5 / 3.7 Thinking Models):** Khi chạy qua 9Router hoặc OpenRouter, AI có thể sinh ra thẻ `<thinking>...</thinking>`. Phải dùng regex dọn sạch các thẻ này trước khi `JSON.parse`.
+5. Sau khi insert DB thành công, di chuyển text gốc xuống `## Synced Transactions` với nhãn `- [x] <text> (✅ synced at <time>)`.
 
-### Workflow 2: DataviewJS Realtime Dashboard
-- **Mục tiêu:** Biến file `Dashboard.md` trong Obsidian thành một màn hình quản lý tài chính động.
-- **Skill cần thiết:** Viết đoạn mã JavaScript nhúng trong block `\`\`\`dataviewjs`. Mã này sẽ gọi Supabase REST API (đọc `current_balance` từ bảng `accounts` và `remaining_amount` từ bảng `debts`) và hiển thị thành bảng số liệu, thanh tiến trình (progress bar `▓▓▓░░`) ngay trong Obsidian.
+---
 
-### Workflow 3: Debt & Cashback Lifecycle Management
-- **Mục tiêu:** Xử lý nghiệp vụ phức tạp của việc trả nợ (FIFO) và chu kỳ hoàn tiền (Statement cycle).
-- **Skill cần thiết:** Xây dựng các Supabase Edge Functions (TypeScript). Khi có giao dịch trả nợ (`repayment`), tự động trừ số tiền còn nợ của các khoản vay cũ nhất theo logic FIFO.
+## Skill 2: Supabase Schema & Triggers Interaction
+
+### Quy tắc ACID
+- Mọi biến động số dư tài khoản (`current_balance`) KHÔNG BAO GIỜ được update thủ công từ client hay agent. Luôn dựa vào Trigger `calculate_account_balance()` trong PostgreSQL.
+- Khi tạo 1 giao dịch chuyển tiền (`transfer`), bắt buộc tạo 2 records: `transfer_out` cho tài khoản nguồn và `transfer_in` cho tài khoản đích.
+- Khi làm việc với `debts` (khoản nợ / cho vay), Trigger `calculate_debt_remaining_amount()` sẽ tự động trừ `repaid_amount` và chuyển `status` sang `partial` hoặc `settled`.
+
+---
+
+## Skill 3: Obsidian DataviewJS Dashboarding
+
+### Workflow hiển thị
+- Giao diện người dùng hoàn toàn nằm trong Obsidian (thư mục `vault/00_Dashboard`).
+- Khi phát triển UI mới, không tạo React / Vue app.
+- Sử dụng code block `dataviewjs` kết hợp `fetch()` gọi trực tiếp REST API (PostgREST) của Supabase để query dữ liệu realtime và dùng bảng markdown hoặc SVG để vẽ biểu đồ.
+
+---
+
+## Skill 4: Automation & Sync (n8n & Google Sheets)
+
+### Workflow Webhook Sync
+- Database Supabase sử dụng **Database Webhooks** (bắn HTTP POST khi table `transactions` có insert mới mang `status = posted`).
+- Agent hoặc n8n lắng nghe webhook này để định dạng ngày tháng/số tiền và gọi API **Append Row** vào Google Sheets gốc để đảm bảo tính năng lưu trữ append-only.

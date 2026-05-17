@@ -1,5 +1,5 @@
+node_modules/
+.env
 .DS_Store
-agent/node_modules
-agent/.env
-.obsidian/workspace
-.obsidian/workspace-mobile
+dist/
+build/
