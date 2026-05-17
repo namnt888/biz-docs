@@ -3,7 +3,6 @@ node_modules/
 .DS_Store
 dist/
 build/
-config.json
 
 # Ignore Obsidian transient workspace files anywhere in the repo
 **/.obsidian/workspace*

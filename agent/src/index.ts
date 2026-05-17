@@ -79,7 +79,7 @@ async function parseTransactionsWithAI(lines: string[]) {
   }
 }
 
-async function processDailyLog() {
+export async function processDailyLog() {
   const vaultPath = process.env.OBSIDIAN_VAULT_PATH || '../vault';
   const todayFile = path.join(vaultPath, '01_Daily_Logs', 'Today.md');
   
@@ -89,7 +89,6 @@ async function processDailyLog() {
   }
 
   const content = fs.readFileSync(todayFile, 'utf8');
-  console.log(`--- Processing content in Today.md ---`);
 
   const lines = content.split('\n');
   let isUnsyncedSection = false;
@@ -128,10 +127,10 @@ async function processDailyLog() {
   }
 
   if (unsyncedLines.length === 0) {
-    console.log('No unsynced transactions found to process.');
-    return;
+    return; // Silent if nothing to sync
   }
 
+  console.log(`\n--- Processing content in Today.md ---`);
   console.log(`Found ${unsyncedLines.length} unsynced transactions:`, unsyncedLines);
   console.log(`Connecting to AI Gateway (${process.env.AI_BASE_URL}) using model ${modelName}...`);
 
@@ -147,7 +146,6 @@ async function processDailyLog() {
   console.log(`[Supabase sync ready] Attempting DB insertion & advanced services...`);
   
   for (const item of parsedTxns) {
-    // 1. Resolve Account
     const { data: accounts } = await supabase
       .from('accounts')
       .select('id, name')
@@ -167,7 +165,6 @@ async function processDailyLog() {
       if (newAcc) accountId = newAcc.id;
     }
 
-    // 2. Resolve Person (if mentioned)
     let personId = null;
     if (item.person_name) {
       const { data: people } = await supabase
@@ -189,7 +186,6 @@ async function processDailyLog() {
       }
     }
 
-    // 3. Insert Transaction
     if (accountId) {
       const { data: insertedTxn, error: insErr } = await supabase
         .from('transactions')
@@ -213,7 +209,6 @@ async function processDailyLog() {
       } else {
         console.log(`✅ Inserted '${item.note}' (${item.amount} VND) successfully!`);
         
-        // 4. Trigger Advanced Services
         const payload = {
           id: insertedTxn.id,
           account_id: accountId,
@@ -233,8 +228,7 @@ async function processDailyLog() {
     }
   }
 
-  // Update Today.md file
-  const timestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const timestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   for (const raw of unsyncedLines) {
     syncedLines.push(`- [x] ${raw} (✅ synced at ${timestamp})`);
   }
@@ -244,4 +238,7 @@ async function processDailyLog() {
   console.log(`✅ Updated ${todayFile} with synced status!`);
 }
 
-processDailyLog().catch(console.error);
+// Only auto-run if executed directly via CLI
+if (process.argv[1]?.includes('index.ts')) {
+  processDailyLog().catch(console.error);
+}
