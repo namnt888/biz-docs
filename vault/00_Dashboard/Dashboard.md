@@ -25,7 +25,7 @@ try {
     
     dv.header(3, `💰 Tổng tài sản: ${total.toLocaleString()} VND`);
     dv.table(["Tài khoản", "Loại", "Số dư hiện tại"], accounts.map(a => [
-      `**${a.name}**`,
+      `**[[${a.name}]]**`,
       a.type.toUpperCase(),
       `${Number(a.current_balance).toLocaleString()} ${a.currency}`
     ]));
@@ -119,7 +119,7 @@ try {
         const bar = "▓".repeat(filled) + "░".repeat(barLength - filled);
         
         return [
-          `**${personName}**`, role, d.notes || "-",
+          `**[[${personName}]]**`, role, d.notes || "-",
           `${orig.toLocaleString()} VND`, `${repaid.toLocaleString()} VND`,
           `**${remain.toLocaleString()} VND**`, `${bar} (${percent}%)`
         ];

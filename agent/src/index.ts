@@ -73,6 +73,8 @@ Examples:
 - Sheet (6 cols, no account): "Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower" -> { "type": "expense", "amount": 1971346, "note": "Điện T4", "cashback_share_percent": 0.01, "cashback_mode": "percent", "account_name": "Power", "category_name": "Điện nước" }
 - Sheet (7 cols, with account): "Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower\tTpbank" -> { "type": "expense", "amount": 1971346, "note": "Điện T4", "cashback_share_percent": 0.01, "cashback_mode": "percent", "account_name": "Tpbank", "category_name": "Điện nước" }
 - Sheet (6 cols): "Out\t01-05\tYoutube 2026-05 [2 slots] [29,243]/6\t58.485\t0,00\tYoutube" -> { "type": "expense", "amount": 58485, "note": "Youtube 2026-05 [2 slots]", "cashback_share_percent": 0, "cashback_mode": "none_back", "account_name": "Youtube" }
+- Mixed (Person + Account + Sheet): "Lâm Tpbank Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower" -> { "type": "expense", "amount": 1971346, "note": "Điện T4", "person_name": "Lâm", "account_name": "Tpbank", "cashback_share_percent": 0.01, "cashback_mode": "percent", "category_name": "Điện nước" }
+- Mixed: "My Tpbank Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower" -> { "type": "expense", "amount": 1971346, "note": "Điện T4", "person_name": "My", "account_name": "Tpbank", "cashback_share_percent": 0.01, "cashback_mode": "percent" }
 
 Return ONLY valid JSON array [ { ... } ]. Do not include markdown formatting or any explanations.
 `;

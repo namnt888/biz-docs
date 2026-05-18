@@ -32,7 +32,7 @@ try {
       const qualStr = isQual ? "✅ Đạt chuẩn" : `⏳ Thiếu ${(minSpend - spent).toLocaleString()} VND`;
       
       return [
-        `**${accMap[c.account_id] || "Card"}**`,
+        `**[[${accMap[c.account_id] || "Card"}]]**`,
         `\`${c.cycle_tag}\` (${c.cycle_type})`,
         `${spent.toLocaleString()} VND`,
         `${minSpend.toLocaleString()} VND`,

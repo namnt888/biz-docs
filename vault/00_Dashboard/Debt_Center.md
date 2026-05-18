@@ -56,7 +56,7 @@ try {
       else netStr = "⚪ Tất toán (0 VND)";
       
       return [
-        `**${p.name}**`,
+        `**[[${p.name}]]**`,
         `${p.lent.toLocaleString()} VND`, `${p.repaidLent.toLocaleString()} VND`,
         `${p.borrowed.toLocaleString()} VND`, `${p.repaidBorrow.toLocaleString()} VND`,
         netStr
@@ -90,7 +90,7 @@ try {
     
     dv.table(["Thời gian phát sinh", "Đối tác", "Phân loại", "Ghi chú", "Tổng số tiền", "Đã trả", "Còn nợ"], debts.map(d => [
       new Date(d.occurred_at).toLocaleDateString('vi-VN'),
-      `**${peopleMap[d.person_id] || "Unknown"}**`,
+      `**[[${peopleMap[d.person_id] || "Unknown"}]]**`,
       d.debt_role === 'lent' ? "🟢 Cho vay" : "🔴 Đi mượn",
       d.notes || "-",
       `${Number(d.original_amount).toLocaleString()} VND`,
