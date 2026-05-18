@@ -33,6 +33,8 @@ if (accRes.ok && txnRes.ok) {
   
   txns.forEach(t => {
     const amt = Number(t.amount);
+    const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
+    const net = amt - cb + Number(t.metadata?.service_fee || 0);
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
     const isThisMonth = t.occurred_at >= startOfMonth;
     
@@ -94,15 +96,24 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${ac
 
 if (res.ok) {
   const txns = await res.json();
-  dv.table(["Ngày", "Phân loại", "Số tiền", "Ghi chú", "CB Mode"], txns.map(t => {
+  dv.table(["Tháng", "Ngày", "Phân loại", "Số tiền", "CB / Net", "Ghi chú"], txns.map(t => {
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
     const sign = isPlus ? "🟢 +" : "🔴 -";
+    const d = new Date(t.occurred_at);
+    const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    
+    const amt = Number(t.amount);
+    const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
+    const net = amt - cb + Number(t.metadata?.service_fee || 0);
+    const cbStr = cb > 0 ? `CB: ${cb.toLocaleString()}đ<br>Net: ${net.toLocaleString()}đ` : '-';
+    
     return [
-      new Date(t.occurred_at).toLocaleString('vi-VN'),
+      `[[${mStr}]]`,
+      d.toLocaleString('vi-VN'),
       t.type,
-      `**${sign}${Number(t.amount).toLocaleString()} đ**`,
-      t.note || "-",
-      t.cashback_mode || "-"
+      `**${sign}${amt.toLocaleString()} đ**`,
+      cbStr,
+      t.note || "-"
     ];
   }));
 }

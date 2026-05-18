@@ -63,6 +63,8 @@ if (accRes.ok && txnRes.ok) {
   
   txns.forEach(t => {
     const amt = Number(t.amount);
+    const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
+    const net = amt - cb + Number(t.metadata?.service_fee || 0);
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
     const isThisMonth = t.occurred_at >= startOfMonth;
     
@@ -124,15 +126,24 @@ const res = await fetch(\`\${SUPABASE_URL}/rest/v1/transactions?account_id=eq.\$
 
 if (res.ok) {
   const txns = await res.json();
-  dv.table(["Ngày", "Phân loại", "Số tiền", "Ghi chú", "CB Mode"], txns.map(t => {
+  dv.table(["Tháng", "Ngày", "Phân loại", "Số tiền", "CB / Net", "Ghi chú"], txns.map(t => {
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
     const sign = isPlus ? "🟢 +" : "🔴 -";
+    const d = new Date(t.occurred_at);
+    const mStr = \`\${d.getFullYear()}-\${String(d.getMonth() + 1).padStart(2, '0')}\`;
+    
+    const amt = Number(t.amount);
+    const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
+    const net = amt - cb + Number(t.metadata?.service_fee || 0);
+    const cbStr = cb > 0 ? \`CB: \${cb.toLocaleString()}đ<br>Net: \${net.toLocaleString()}đ\` : '-';
+    
     return [
-      new Date(t.occurred_at).toLocaleString('vi-VN'),
+      \`[[\${mStr}]]\`,
+      d.toLocaleString('vi-VN'),
       t.type,
-      \`**\${sign}\${Number(t.amount).toLocaleString()} đ**\`,
-      t.note || "-",
-      t.cashback_mode || "-"
+      \`**\${sign}\${amt.toLocaleString()} đ**\`,
+      cbStr,
+      t.note || "-"
     ];
   }));
 }
@@ -171,15 +182,20 @@ const res = await fetch(\`\${SUPABASE_URL}/rest/v1/debts?person_id=eq.\${personI
 if (res.ok) {
   const debts = await res.json();
   if (debts.length > 0) {
-    dv.table(["Ngày", "Loại", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Trạng thái"], debts.map(d => {
+    dv.table(["Tháng", "Kỳ (Cycle)", "Ngày", "Loại", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Trạng thái"], debts.map(d => {
       const isLent = d.debt_role === 'lent';
       const roleStr = isLent ? "🟢 Cho vay" : "🔴 Đi mượn";
       let statusStr = "⚪ Đã trả hết (Settled)";
       if (d.status === 'pending') statusStr = "🔴 Chưa trả (Pending)";
       if (d.status === 'partial') statusStr = "🟠 Đang trả (Partial)";
       
+      const dt = new Date(d.occurred_at);
+      const mStr = \`\${dt.getFullYear()}-\${String(dt.getMonth() + 1).padStart(2, '0')}\`;
+      
       return [
-        new Date(d.occurred_at).toLocaleDateString('vi-VN'),
+        \`[[\${mStr}]]\`,
+        mStr,
+        dt.toLocaleDateString('vi-VN'),
         roleStr,
         d.notes || "-",
         \`\${Number(d.original_amount).toLocaleString()} đ\`,
@@ -207,12 +223,24 @@ const res = await fetch(\`\${SUPABASE_URL}/rest/v1/transactions?person_id=eq.\${
 if (res.ok) {
   const txns = await res.json();
   if (txns.length > 0) {
-    dv.table(["Ngày", "Phân loại", "Số tiền", "Ghi chú"], txns.map(t => [
-      new Date(t.occurred_at).toLocaleString('vi-VN'),
-      t.type,
-      \`**\${Number(t.amount).toLocaleString()} đ**\`,
-      t.note || "-"
-    ]));
+    dv.table(["Tháng", "Ngày", "Phân loại", "Số tiền", "CB / Net", "Ghi chú"], txns.map(t => {
+      const d = new Date(t.occurred_at);
+      const mStr = \`\${d.getFullYear()}-\${String(d.getMonth() + 1).padStart(2, '0')}\`;
+      
+      const amt = Number(t.amount);
+      const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
+      const net = amt - cb + Number(t.metadata?.service_fee || 0);
+      const cbStr = cb > 0 ? \`CB: \${cb.toLocaleString()}đ<br>Net: \${net.toLocaleString()}đ\` : '-';
+      
+      return [
+        \`[[\${mStr}]]\`,
+        d.toLocaleString('vi-VN'),
+        t.type,
+        \`**\${amt.toLocaleString()} đ**\`,
+        cbStr,
+        t.note || "-"
+      ];
+    }));
   } else {
     dv.paragraph("Không có giao dịch.");
   }

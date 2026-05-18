@@ -292,29 +292,39 @@ export async function processDailyLog() {
   }
 
   const timestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const syncedPrefix = headerLines.some(l => l.includes('Synced Transactions') && l.trim().startsWith('>')) ? '> ' : '';
+  const hasTable = syncedLines.some(l => l.includes('|---|') || l.includes('| ---'));
+  
+  if (!hasTable && unsyncedLines.length > 0) {
+    syncedLines.push(`\n| ⏰ Giờ | 👤 Người | 💳 Thẻ | 📊 Loại | 💰 Số tiền | 📝 Ghi chú | 🎁 Hoàn / Phí |`);
+    syncedLines.push(`|---|---|---|---|---|---|---|`);
+  }
 
   for (let i = 0; i < unsyncedLines.length; i++) {
     const raw = unsyncedLines[i];
     const warn = syncWarnings[i] || "";
     const item = parsedTxns[i];
-    let netInfo = "";
-    if (item && (item.cashback_share_percent || item.cashback_share_fixed || item.service_fee)) {
+    
+    if (!item) {
+      syncedLines.push(`| ${timestamp} | - | - | ❓ | - | ${raw} ${warn} | - |`);
+      continue;
+    }
+
+    let pLink = item.person_name ? `[[${item.person_name}]]` : '-';
+    let aLink = item.resolved_account ? `[[${item.resolved_account}]]` : (item.account_name ? `[[${item.account_name}]]` : '-');
+    let tSign = item.type === 'income' || item.type === 'repayment' ? '🟢' : (item.type === 'expense' ? '🔴' : '🔄');
+    let amtStr = `**${Number(item.amount).toLocaleString()} đ**`;
+    let noteStr = (item.note || raw) + (warn ? ` *(⚠️ ${warn})*` : '');
+    
+    let extraStr = '-';
+    if (item.cashback_share_percent || item.cashback_share_fixed || item.service_fee) {
       const amt = Number(item.amount || 0);
       const fee = Number(item.service_fee || 0);
       const cb = item.cashback_share_percent ? Math.round(amt * item.cashback_share_percent) : Number(item.cashback_share_fixed || 0);
       const net = amt - cb + fee;
-      netInfo = ` [💸 Net: ${net.toLocaleString()}đ | 🎁 CB: ${cb.toLocaleString()}đ${fee ? ` | ⚡ Fee: ${fee.toLocaleString()}đ` : ''}]`;
+      extraStr = `Net: ${net.toLocaleString()}đ<br>CB: ${cb.toLocaleString()}đ${fee ? `<br>Fee: ${fee.toLocaleString()}đ` : ''}`;
     }
-    let formattedStr = raw;
-    if (item) {
-      const pLink = item.person_name ? `[[${item.person_name}]] - ` : '';
-      const aLink = item.resolved_account ? `[[${item.resolved_account}]] - ` : (item.account_name ? `[[${item.account_name}]] - ` : '');
-      const tSign = item.type === 'income' || item.type === 'repayment' ? '🟢' : (item.type === 'expense' ? '🔴' : '🔄');
-      const amtStr = `${Number(item.amount).toLocaleString()}đ`;
-      formattedStr = `${pLink}${aLink}${tSign} ${amtStr} - ${item.note || raw}`;
-    }
-    syncedLines.push(`${syncedPrefix}- [x] ${formattedStr} (✅ synced at ${timestamp})${warn}${netInfo}`);
+    
+    syncedLines.push(`| ${timestamp} | ${pLink} | ${aLink} | ${tSign} | ${amtStr} | ${noteStr} | ${extraStr} |`);
   }
 
   const newContent = [...headerLines, ...syncedLines, ...footerLines].join('\n');
