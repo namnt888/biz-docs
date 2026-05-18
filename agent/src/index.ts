@@ -6,6 +6,13 @@ import * as path from 'path';
 import WebSocket from 'ws';
 import { CashbackService } from './services/cashback';
 import { DebtService } from './services/debt';
+import { exec } from 'child_process';
+
+const notifyMac = (title: string, subtitle: string, message: string) => {
+  exec(`osascript -e 'display notification "${message}" with title "${title}" subtitle "${subtitle}"'`, (err) => {
+    if (err) console.error("Notification error:", err);
+  });
+};
 
 dotenv.config();
 
@@ -31,25 +38,38 @@ const debtService = new DebtService(supabase);
 const SYSTEM_PROMPT = `
 You are a financial transaction parsing AI agent for 'Obsidian Money'.
 Your job is to parse natural language spending/income inputs into a structured JSON array.
+
 Each transaction should conform strictly to the following JSON schema:
 {
-  "occurred_at": "ISO-8601 timestamp (use current time if not specified)",
+  "occurred_at": "ISO-8601 timestamp (use current time if not specified, try to infer date from context like '06-05' -> current year)",
   "type": "expense" | "income" | "transfer_in" | "transfer_out" | "cashback" | "debt" | "repayment",
-  "amount": number (integer, positive absolute value in VND, e.g., 45k = 45000, 500k = 500000),
+  "amount": number (integer, positive absolute value in VND, e.g., 45k = 45000, 500k = 500000, "1.971.346" = 1971346),
   "note": string (the description of what was bought or done),
-  "account_name": string (guessed name of account, e.g., "Vpbank", "Techcombank", "MoMo", "Tiền mặt"),
-  "category_name": string (guessed category, e.g., "Ăn uống", "Mua sắm", "Di chuyển", "Cho vay"),
-  "person_name": string (optional, if the transaction involves borrowing, lending, or paying a specific person, e.g., "Nam", "Hương", "Lâm"),
+  "account_name": string (guessed name of account, e.g., "Vpbank", "Techcombank", "MoMo", "Tiền mặt". Use ShopSource column as account hint if present),
+  "category_name": string (guessed category, e.g., "Ăn uống", "Mua sắm", "Di chuyển", "Cho vay", "Điện nước"),
+  "person_name": string (optional, if the transaction involves a person),
   "cashback_mode": string (optional: "none_back" | "percent" | "fixed" | "real_fixed" | "real_percent" | "voluntary"),
-  "cashback_share_percent": number (optional, decimal representation of percent, e.g. "-8%" -> 0.08, "50%" -> 0.5),
-  "cashback_share_fixed": number (optional, integer amount if fixed cashback, e.g. "+50k" -> 50000),
-  "service_fee": number (optional, integer in VND if the note mentions fees/surcharges, e.g., "phí 50k" -> 50000),
+  "cashback_share_percent": number (optional, decimal representation of percent, e.g. "-8%" -> 0.08, "1,00" in % column -> 0.01),
+  "cashback_share_fixed": number (optional, integer amount if fixed cashback),
+  "service_fee": number (optional, integer in VND if the note mentions fees/surcharges),
   "is_installment": boolean (optional, true if mentioned as installment/trả góp)
 }
 
+SHEET FORMAT SUPPORT:
+You can also parse tab-separated Google Sheet rows in the format:
+  Type[TAB]Date[TAB]Notes[TAB]Amount[TAB]%Back[TAB]ShopSource
+Where:
+  - Type: "Out" = expense, "In" = income
+  - Date: "DD-MM" or "MM-DD" format (assume current year)
+  - Amount: may use dots as thousands separator e.g. "1.971.346" = 1971346
+  - %Back: cashback percent e.g. "1,00" = 1% -> cashback_share_percent: 0.01
+  - ShopSource: use as account_name hint (e.g. "Power" = "Điện lực", "Youtube" = account is wherever you pay)
+
 Examples:
-- "Lâm shopee zakka 115k -8%" -> { "type": "expense", "amount": 115000, "note": "shopee zakka", "person_name": "Lâm", "cashback_mode": "percent", "cashback_share_percent": 0.08 }
-- "Nam mua đồ 200k +20k" -> { "type": "expense", "amount": 200000, "note": "mua đồ", "person_name": "Nam", "cashback_mode": "fixed", "cashback_share_fixed": 20000 }
+- Natural: "Lâm shopee zakka 115k -8% Tpbank" -> { "type": "expense", "amount": 115000, "note": "shopee zakka", "person_name": "Lâm", "cashback_mode": "percent", "cashback_share_percent": 0.08, "account_name": "Tpbank" }
+- Natural: "Nam mua đồ 200k +20k Vpbank" -> { "type": "expense", "amount": 200000, "note": "mua đồ", "person_name": "Nam", "cashback_mode": "fixed", "cashback_share_fixed": 20000, "account_name": "Vpbank" }
+- Sheet row: "Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower" -> { "type": "expense", "occurred_at": "<current-year>-05-06T00:00:00Z", "amount": 1971346, "note": "Điện T4", "cashback_share_percent": 0.01, "cashback_mode": "percent", "account_name": "Power", "category_name": "Điện nước" }
+- Sheet row: "Out\t01-05\tYoutube 2026-05 [2 slots] [29,243]/6\t58.485\t0,00\tYoutube" -> { "type": "expense", "amount": 58485, "note": "Youtube 2026-05 [2 slots]", "cashback_share_percent": 0, "cashback_mode": "none_back", "account_name": "Youtube" }
 
 Return ONLY valid JSON array [ { ... } ]. Do not include markdown formatting or any explanations.
 `;
@@ -150,6 +170,7 @@ export async function processDailyLog() {
   console.log(`\n--- Processing content in Today.md ---`);
   console.log(`Found ${unsyncedLines.length} unsynced transactions:`, unsyncedLines);
   console.log(`Connecting to AI Gateway (${process.env.AI_BASE_URL}) using model ${modelName}...`);
+  notifyMac('Obsidian Money', 'AI Daemon', `Đang phân tích ${unsyncedLines.length} giao dịch...`);
 
   const parsedTxns = await parseTransactionsWithAI(unsyncedLines);
   if (!parsedTxns || !Array.isArray(parsedTxns)) {
@@ -337,6 +358,7 @@ export async function processDailyLog() {
   const newContent = [...headerLines, ...syncedLines, ...footerLines].join('\n');
   fs.writeFileSync(monthlyFile, newContent, 'utf8');
   console.log(`✅ Updated ${monthlyFile} with synced status!`);
+  notifyMac('Obsidian Money', 'Hoàn tất!', `Đã đồng bộ thành công ${unsyncedLines.length} giao dịch.`);
 }
 
 // Only auto-run if executed directly via CLI

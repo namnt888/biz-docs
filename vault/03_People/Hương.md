@@ -6,7 +6,7 @@ id: 00c71cfc-b336-4e94-9362-23b30344bdf4
 
 [👈 Trở về Debt Center](../00_Dashboard/Debt_Center.md)
 
-## 🤝 Tình trạng Công nợ
+## 🤝 Tổng quan Công nợ
 
 ```dataviewjs
 const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
@@ -19,20 +19,22 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/debts?person_id=eq.${personId}&
 if (res.ok) {
   const debts = await res.json();
   if (debts.length > 0) {
-    dv.table(["Tháng", "Kỳ (Cycle)", "Ngày", "Loại", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Trạng thái"], debts.map(d => {
+    // Summary row
+    const totalOrig = debts.reduce((s, d) => s + Number(d.original_amount), 0);
+    const totalRepaid = debts.reduce((s, d) => s + Number(d.repaid_amount), 0);
+    const totalRemain = debts.reduce((s, d) => s + Number(d.remaining_amount), 0);
+    dv.paragraph(`📊 **Tổng nợ:** ${totalOrig.toLocaleString()} đ &nbsp;|&nbsp; **Đã trả:** ${totalRepaid.toLocaleString()} đ &nbsp;|&nbsp; **Còn lại:** ${totalRemain.toLocaleString()} đ`);
+
+    dv.table(["Kỳ (Cycle)", "Loại", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Trạng thái"], debts.map(d => {
       const isLent = d.debt_role === 'lent';
       const roleStr = isLent ? "🟢 Cho vay" : "🔴 Đi mượn";
-      let statusStr = "⚪ Đã trả hết (Settled)";
-      if (d.status === 'pending') statusStr = "🔴 Chưa trả (Pending)";
-      if (d.status === 'partial') statusStr = "🟠 Đang trả (Partial)";
-      
+      let statusStr = "⚪ Settled";
+      if (d.status === 'pending') statusStr = "🔴 Pending";
+      if (d.status === 'partial') statusStr = "🟠 Partial";
       const dt = new Date(d.occurred_at);
       const mStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-      
       return [
-        `[[${mStr}]]`,
         mStr,
-        dt.toLocaleDateString('vi-VN'),
         roleStr,
         d.notes || "-",
         `${Number(d.original_amount).toLocaleString()} đ`,
@@ -42,12 +44,14 @@ if (res.ok) {
       ];
     }));
   } else {
-    dv.paragraph("Không có công nợ nào với người này.");
+    dv.paragraph("Không có công nợ nào với người này. ✅");
   }
 }
 ```
 
-## 📜 Giao dịch liên quan
+## 📜 Giao dịch liên quan (theo tháng)
+
+> [!info] Bấm vào từng tháng để mở rộng danh sách giao dịch
 
 ```dataviewjs
 const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
@@ -59,29 +63,55 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${per
 
 if (res.ok) {
   const txns = await res.json();
-  if (txns.length > 0) {
-    dv.table(["ID", "Tháng", "Ngày", "Phân loại", "Số tiền", "CB / Net", "Ghi chú"], txns.map(t => {
+  if (txns.length === 0) {
+    dv.paragraph("Không có giao dịch.");
+  } else {
+    // Group by month
+    const byMonth = {};
+    txns.forEach(t => {
       const d = new Date(t.occurred_at);
       const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const shortId = t.id ? t.id.substring(0, 5) : '-';
-      
-      const amt = Number(t.amount);
-      const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
-      const net = amt - cb + Number(t.metadata?.service_fee || 0);
-      const cbStr = cb > 0 ? `CB: ${cb.toLocaleString()}đ<br>Net: ${net.toLocaleString()}đ` : '-';
-      
-      return [
-        `\`${shortId}\``,
-        `[[${mStr}]]`,
-        d.toLocaleString('vi-VN'),
-        t.type,
-        `**${amt.toLocaleString()} đ**`,
-        cbStr,
-        t.note || "-"
-      ];
-    }));
-  } else {
-    dv.paragraph("Không có giao dịch.");
+      if (!byMonth[mStr]) byMonth[mStr] = [];
+      byMonth[mStr].push(t);
+    });
+
+    for (const [month, monthTxns] of Object.entries(byMonth)) {
+      const monthArr = monthTxns as any[];
+      const totalAmt = monthArr.reduce((s, t) => s + Number(t.amount), 0);
+      const totalCB = monthArr.reduce((t2, t) => {
+        const amt = Number(t.amount);
+        const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
+        return t2 + cb;
+      }, 0);
+
+      dv.header(3, `📅 [[${month}]] — ${monthArr.length} giao dịch | Tổng: ${totalAmt.toLocaleString()} đ | CB: ${totalCB.toLocaleString()} đ`);
+
+      dv.table(
+        ["ID", "Ngày", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
+        monthArr.map(t => {
+          const d = new Date(t.occurred_at);
+          const shortId = t.id ? t.id.substring(0, 5) : '-';
+          const amt = Number(t.amount);
+          const cbPct = Number(t.cashback_share_percent || 0);
+          const cbFixed = Number(t.cashback_share_fixed || 0);
+          const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
+          const fee = Number(t.metadata?.service_fee || 0);
+          const net = amt - cbSum + fee;
+          const sign = ['income','repayment','refund','transfer_in'].includes(t.type) ? '🟢 +' : '🔴 -';
+          return [
+            `\`${shortId}\``,
+            d.toLocaleDateString('vi-VN'),
+            `${sign}${t.type}`,
+            `**${amt.toLocaleString()} đ**`,
+            cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
+            cbFixed > 0 ? `${cbFixed.toLocaleString()} đ` : '-',
+            cbSum > 0 ? `${cbSum.toLocaleString()} đ` : '-',
+            `**${net.toLocaleString()} đ**`,
+            t.note || "-"
+          ];
+        })
+      );
+    }
   }
 }
 ```
