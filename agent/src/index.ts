@@ -155,30 +155,33 @@ export async function processDailyLog() {
   console.log(`[Supabase sync ready] Attempting DB insertion & advanced services...`);
   const syncWarnings: string[] = [];
   
-  for (const item of parsedTxns) {
-    const { data: accounts } = await supabase
-      .from('accounts')
-      .select('id, name')
-      .ilike('name', `%${item.account_name || 'Cash'}%`)
-      .limit(5);
+  // Fetch all accounts once for fuzzy space-stripped matching
+  const { data: allAccounts } = await supabase.from('accounts').select('id, name, current_balance');
 
+  for (const item of parsedTxns) {
     let accountId = null;
     let resolvedName = item.account_name || 'Cash';
     let warningNote = "";
 
-    if (accounts && accounts.length === 1) {
-      accountId = accounts[0].id;
-      resolvedName = accounts[0].name;
-    } else if (accounts && accounts.length > 1) {
-      const exact = accounts.find(a => a.name.toLowerCase() === item.account_name?.toLowerCase());
+    const matches = (allAccounts || []).filter(a => {
+      const cleanTarget = (item.account_name || 'Cash').toLowerCase().replace(/[\s\-_]+/g, '');
+      const cleanAcc = a.name.toLowerCase().replace(/[\s\-_]+/g, '');
+      return cleanAcc.includes(cleanTarget) || cleanTarget.includes(cleanAcc);
+    });
+
+    if (matches && matches.length === 1) {
+      accountId = matches[0].id;
+      resolvedName = matches[0].name;
+    } else if (matches && matches.length > 1) {
+      const exact = matches.find(a => a.name.toLowerCase().replace(/\s+/g, '') === (item.account_name || '').toLowerCase().replace(/\s+/g, ''));
       if (exact) {
         accountId = exact.id;
         resolvedName = exact.name;
       } else {
-        accountId = accounts[0].id;
-        resolvedName = accounts[0].name;
+        accountId = matches[0].id;
+        resolvedName = matches[0].name;
         warningNote = ` [⚠️ Ambiguous '${item.account_name}', auto-picked '${resolvedName}']`;
-        console.warn(`[!] Ambiguous account '${item.account_name}'. Multiple matches: ${accounts.map(a => a.name).join(', ')}. Auto-picked '${resolvedName}'.`);
+        console.warn(`[!] Ambiguous account '${item.account_name}'. Matches: ${matches.map(a => a.name).join(', ')}. Auto-picked '${resolvedName}'.`);
       }
     } else {
       console.log(`Account '${item.account_name}' not found. Creating dummy account...`);
@@ -248,6 +251,16 @@ export async function processDailyLog() {
         console.error(`Error inserting transaction:`, insErr?.message);
       } else {
         console.log(`✅ Inserted '${item.note}' (${item.amount} VND) successfully!`);
+        
+        // Explicitly update account balance via Node.js to ensure 100% reliability
+        const { data: acc } = await supabase.from('accounts').select('current_balance').eq('id', accountId).single();
+        if (acc) {
+          const isPlus = item.type === 'income' || item.type === 'repayment' || item.type === 'refund' || item.type === 'transfer_in';
+          const delta = Number(amt);
+          const newBalance = isPlus ? Number(acc.current_balance) + delta : Number(acc.current_balance) - delta;
+          await supabase.from('accounts').update({ current_balance: newBalance, updated_at: new Date().toISOString() }).eq('id', accountId);
+          console.log(`💲 Account '${resolvedName}' balance updated to ${newBalance.toLocaleString()} VND`);
+        }
         
         const payload = {
           id: insertedTxn.id,
