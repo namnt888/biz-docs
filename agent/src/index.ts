@@ -39,13 +39,18 @@ Each transaction should conform strictly to the following JSON schema:
   "note": string (the description of what was bought or done),
   "account_name": string (guessed name of account, e.g., "Vpbank", "Techcombank", "MoMo", "Tiền mặt"),
   "category_name": string (guessed category, e.g., "Ăn uống", "Mua sắm", "Di chuyển", "Cho vay"),
-  "person_name": string (optional, if the transaction involves borrowing, lending, or paying a specific person, e.g., "Nam", "Hương"),
+  "person_name": string (optional, if the transaction involves borrowing, lending, or paying a specific person, e.g., "Nam", "Hương", "Lâm"),
   "cashback_mode": string (optional: "none_back" | "percent" | "fixed" | "real_fixed" | "real_percent" | "voluntary"),
-  "cashback_share_percent": number (optional, e.g., 0.5 for 50%),
-  "cashback_share_fixed": number (optional, integer amount),
+  "cashback_share_percent": number (optional, decimal representation of percent, e.g. "-8%" -> 0.08, "50%" -> 0.5),
+  "cashback_share_fixed": number (optional, integer amount if fixed cashback, e.g. "+50k" -> 50000),
   "service_fee": number (optional, integer in VND if the note mentions fees/surcharges, e.g., "phí 50k" -> 50000),
   "is_installment": boolean (optional, true if mentioned as installment/trả góp)
 }
+
+Examples:
+- "Lâm shopee zakka 115k -8%" -> { "type": "expense", "amount": 115000, "note": "shopee zakka", "person_name": "Lâm", "cashback_mode": "percent", "cashback_share_percent": 0.08 }
+- "Nam mua đồ 200k +20k" -> { "type": "expense", "amount": 200000, "note": "mua đồ", "person_name": "Nam", "cashback_mode": "fixed", "cashback_share_fixed": 20000 }
+
 Return ONLY valid JSON array [ { ... } ]. Do not include markdown formatting or any explanations.
 `;
 
@@ -284,7 +289,16 @@ export async function processDailyLog() {
   for (let i = 0; i < unsyncedLines.length; i++) {
     const raw = unsyncedLines[i];
     const warn = syncWarnings[i] || "";
-    syncedLines.push(`- [x] ${raw} (✅ synced at ${timestamp})${warn}`);
+    const item = parsedTxns[i];
+    let netInfo = "";
+    if (item && (item.cashback_share_percent || item.cashback_share_fixed || item.service_fee)) {
+      const amt = Number(item.amount || 0);
+      const fee = Number(item.service_fee || 0);
+      const cb = item.cashback_share_percent ? Math.round(amt * item.cashback_share_percent) : Number(item.cashback_share_fixed || 0);
+      const net = amt - cb + fee;
+      netInfo = ` [💸 Net: ${net.toLocaleString()}đ | 🎁 CB: ${cb.toLocaleString()}đ${fee ? ` | ⚡ Fee: ${fee.toLocaleString()}đ` : ''}]`;
+    }
+    syncedLines.push(`- [x] ${raw} (✅ synced at ${timestamp})${warn}${netInfo}`);
   }
 
   const newContent = [...headerLines, ...syncedLines, ...footerLines].join('\n');
