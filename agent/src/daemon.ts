@@ -14,16 +14,22 @@ console.log(`Watching for realtime changes on directory: ${monthlyLogsDir}`);
 let isProcessing = false;
 let debounceTimer: NodeJS.Timeout | null = null;
 
-// Watch all markdown files in monthly logs directory
-const watcher = chokidar.watch(path.join(monthlyLogsDir, '*.md'), {
+// Watch monthly logs directory directly with polling enabled for iCloud Drive compatibility
+const watcher = chokidar.watch(monthlyLogsDir, {
   persistent: true,
+  ignoreInitial: true,
+  usePolling: true,
+  interval: 1000, // Poll every 1 second
   awaitWriteFinish: {
     stabilityThreshold: 1500, // wait 1.5s after typing stops before triggering
     pollInterval: 200,
   },
 });
 
-watcher.on('change', async () => {
+watcher.on('all', async (event, filePath) => {
+  if (event !== 'change' && event !== 'add') return;
+  if (!filePath.endsWith('.md')) return;
+
   if (isProcessing) return;
 
   if (debounceTimer) clearTimeout(debounceTimer);
@@ -31,6 +37,7 @@ watcher.on('change', async () => {
   debounceTimer = setTimeout(async () => {
     isProcessing = true;
     try {
+      console.log(`\n📄 Detected change in ${path.basename(filePath)}. Triggering sync...`);
       await processDailyLog();
     } catch (err) {
       console.error('Daemon execution error:', err);
