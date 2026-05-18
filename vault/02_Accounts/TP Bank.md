@@ -96,11 +96,12 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${ac
 
 if (res.ok) {
   const txns = await res.json();
-  dv.table(["Tháng", "Ngày", "Phân loại", "Số tiền", "CB / Net", "Ghi chú"], txns.map(t => {
+  dv.table(["ID", "Tháng", "Ngày", "Phân loại", "Số tiền", "CB / Net", "Ghi chú"], txns.map(t => {
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
     const sign = isPlus ? "🟢 +" : "🔴 -";
     const d = new Date(t.occurred_at);
     const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const shortId = t.id ? t.id.substring(0, 5) : '-';
     
     const amt = Number(t.amount);
     const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
@@ -108,6 +109,7 @@ if (res.ok) {
     const cbStr = cb > 0 ? `CB: ${cb.toLocaleString()}đ<br>Net: ${net.toLocaleString()}đ` : '-';
     
     return [
+      `\`${shortId}\``,
       `[[${mStr}]]`,
       d.toLocaleString('vi-VN'),
       t.type,

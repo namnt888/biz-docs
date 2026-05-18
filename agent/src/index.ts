@@ -258,10 +258,12 @@ export async function processDailyLog() {
         .select()
         .single();
 
-      if (insErr || !insertedTxn) {
-        console.error(`Error inserting transaction:`, insErr?.message);
+      if (insErr) {
+        console.error(`❌ DB Insert Error:`, insErr.message);
+        syncWarnings.push(` [❌ DB Error: ${insErr.message}]`);
       } else {
-        console.log(`✅ Inserted '${item.note}' (${item.amount} VND) successfully!`);
+        item.inserted_id = insertedTxn.id;
+        console.log(`✅ Inserted '${item.note}' (${amt} VND) successfully!`);
         
         // Explicitly update account balance via Node.js to ensure 100% reliability
         const { data: acc } = await supabase.from('accounts').select('current_balance').eq('id', accountId).single();
@@ -295,8 +297,8 @@ export async function processDailyLog() {
   const hasTable = syncedLines.some(l => l.includes('|---|') || l.includes('| ---'));
   
   if (!hasTable && unsyncedLines.length > 0) {
-    syncedLines.push(`\n| ⏰ Giờ | 👤 Người | 💳 Thẻ | 📊 Loại | 💰 Số tiền | 📝 Ghi chú | 🎁 Hoàn / Phí |`);
-    syncedLines.push(`|---|---|---|---|---|---|---|`);
+    syncedLines.push(`\n| ID | ⏰ Giờ | 👤 Người | 💳 Thẻ | 📊 Loại | 💰 Số tiền | 📝 Ghi chú | 🎁 Hoàn / Phí |`);
+    syncedLines.push(`|---|---|---|---|---|---|---|---|`);
   }
 
   for (let i = 0; i < unsyncedLines.length; i++) {
@@ -305,9 +307,13 @@ export async function processDailyLog() {
     const item = parsedTxns[i];
     
     if (!item) {
-      syncedLines.push(`| ${timestamp} | - | - | ❓ | - | ${raw} ${warn} | - |`);
+      syncedLines.push(`| - | ${timestamp} | - | - | ❓ | - | ${raw} ${warn} | - |`);
       continue;
     }
+
+    // Attempt to extract or generate short ID. Supabase uses UUIDs, but if we don't have it here yet because we inserted it in a different loop...
+    // Wait, we don't have the inserted UUID in `parsedTxns` because `parsedTxns` is just the AI parsed JSON!
+    // But wait! We DO have `item.inserted_id` if we modify the insertion loop to add it!
 
     let pLink = item.person_name ? `[[${item.person_name}]]` : '-';
     let aLink = item.resolved_account ? `[[${item.resolved_account}]]` : (item.account_name ? `[[${item.account_name}]]` : '-');
@@ -324,7 +330,8 @@ export async function processDailyLog() {
       extraStr = `Net: ${net.toLocaleString()}đ<br>CB: ${cb.toLocaleString()}đ${fee ? `<br>Fee: ${fee.toLocaleString()}đ` : ''}`;
     }
     
-    syncedLines.push(`| ${timestamp} | ${pLink} | ${aLink} | ${tSign} | ${amtStr} | ${noteStr} | ${extraStr} |`);
+    const shortId = item.inserted_id ? item.inserted_id.substring(0, 5) : '-';
+    syncedLines.push(`| \`${shortId}\` | ${timestamp} | ${pLink} | ${aLink} | ${tSign} | ${amtStr} | ${noteStr} | ${extraStr} |`);
   }
 
   const newContent = [...headerLines, ...syncedLines, ...footerLines].join('\n');
