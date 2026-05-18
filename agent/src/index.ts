@@ -122,8 +122,9 @@ export async function processDailyLog() {
     }
 
     if (isUnsyncedSection) {
-      if (line.trim().startsWith('-') && line.trim().length > 1) {
-        unsyncedLines.push(line.trim().replace(/^-/, '').trim());
+      const trimmed = line.trim();
+      if (trimmed.length > 0 && !trimmed.startsWith('#') && !trimmed.startsWith('*') && !trimmed.startsWith('>') && !trimmed.startsWith('[')) {
+        unsyncedLines.push(trimmed.replace(/^-/, '').trim());
       } else {
         headerLines.push(line);
       }
@@ -152,6 +153,7 @@ export async function processDailyLog() {
   console.log(JSON.stringify(parsedTxns, null, 2));
 
   console.log(`[Supabase sync ready] Attempting DB insertion & advanced services...`);
+  const syncWarnings: string[] = [];
   
   for (const item of parsedTxns) {
     const { data: accounts } = await supabase
@@ -162,6 +164,7 @@ export async function processDailyLog() {
 
     let accountId = null;
     let resolvedName = item.account_name || 'Cash';
+    let warningNote = "";
 
     if (accounts && accounts.length === 1) {
       accountId = accounts[0].id;
@@ -174,6 +177,7 @@ export async function processDailyLog() {
       } else {
         accountId = accounts[0].id;
         resolvedName = accounts[0].name;
+        warningNote = ` [⚠️ Ambiguous '${item.account_name}', auto-picked '${resolvedName}']`;
         console.warn(`[!] Ambiguous account '${item.account_name}'. Multiple matches: ${accounts.map(a => a.name).join(', ')}. Auto-picked '${resolvedName}'.`);
       }
     } else {
@@ -185,6 +189,7 @@ export async function processDailyLog() {
         .single();
       if (newAcc) accountId = newAcc.id;
     }
+    syncWarnings.push(warningNote);
 
     let personId = null;
     if (item.person_name) {
@@ -263,8 +268,10 @@ export async function processDailyLog() {
   }
 
   const timestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  for (const raw of unsyncedLines) {
-    syncedLines.push(`- [x] ${raw} (✅ synced at ${timestamp})`);
+  for (let i = 0; i < unsyncedLines.length; i++) {
+    const raw = unsyncedLines[i];
+    const warn = syncWarnings[i] || "";
+    syncedLines.push(`- [x] ${raw} (✅ synced at ${timestamp})${warn}`);
   }
 
   const newContent = [...headerLines, ...syncedLines, ...footerLines].join('\n');
