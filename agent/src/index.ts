@@ -97,7 +97,7 @@ export async function processDailyLog() {
     const dir = path.dirname(monthlyFile);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     
-    const template = `# 📅 Ghi chép Chi tiêu Tháng ${d.getMonth() + 1}/${d.getFullYear()}\n\n> Ghi chép các khoản thu chi bằng văn bản tự nhiên dưới mục **Unsynced**.\n\n[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)\n\n---\n\n## Unsynced Transactions\n\n\n## Synced Transactions\n`;
+    const template = `# 📅 Ghi chép Chi tiêu Tháng ${d.getMonth() + 1}/${d.getFullYear()}\n\n[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)\n\n---\n\n> [!todo] 📥 Unsynced Transactions\n> Ghi chép các khoản thu chi bằng văn bản tự nhiên ở dưới.\n\n\n> [!success] 🔄 Synced Transactions\n> AI Daemon sẽ tự động bóc tách và chuyển các giao dịch đã đồng bộ xuống đây.\n`;
     fs.writeFileSync(monthlyFile, template, 'utf8');
   }
 
@@ -113,13 +113,13 @@ export async function processDailyLog() {
   const footerLines: string[] = [];
 
   for (const line of lines) {
-    if (line.trim().startsWith('## Unsynced Transactions')) {
+    if (line.includes('Unsynced Transactions')) {
       isUnsyncedSection = true;
       isSyncedSection = false;
       headerLines.push(line);
       continue;
     }
-    if (line.trim().startsWith('## Synced Transactions')) {
+    if (line.includes('Synced Transactions')) {
       isUnsyncedSection = false;
       isSyncedSection = true;
       syncedLines.push(line);
@@ -128,8 +128,11 @@ export async function processDailyLog() {
 
     if (isUnsyncedSection) {
       const trimmed = line.trim();
-      if (trimmed.length > 0 && !trimmed.startsWith('#') && !trimmed.startsWith('*') && !trimmed.startsWith('>') && !trimmed.startsWith('[')) {
-        unsyncedLines.push(trimmed.replace(/^-/, '').trim());
+      // Extract transactions from unsynced section
+      // Match lines that look like a list item: `- something` or `> - something`
+      const match = trimmed.match(/^>?\s*-\s+(.*)/);
+      if (match) {
+        unsyncedLines.push(match[1].trim());
       } else {
         headerLines.push(line);
       }
@@ -197,6 +200,9 @@ export async function processDailyLog() {
         .single();
       if (newAcc) accountId = newAcc.id;
     }
+    
+    // Store resolved account name for backlink formatting
+    item.resolved_account = resolvedName;
     syncWarnings.push(warningNote);
 
     let personId = null;
@@ -286,6 +292,8 @@ export async function processDailyLog() {
   }
 
   const timestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const syncedPrefix = headerLines.some(l => l.includes('Synced Transactions') && l.trim().startsWith('>')) ? '> ' : '';
+
   for (let i = 0; i < unsyncedLines.length; i++) {
     const raw = unsyncedLines[i];
     const warn = syncWarnings[i] || "";
@@ -298,7 +306,15 @@ export async function processDailyLog() {
       const net = amt - cb + fee;
       netInfo = ` [💸 Net: ${net.toLocaleString()}đ | 🎁 CB: ${cb.toLocaleString()}đ${fee ? ` | ⚡ Fee: ${fee.toLocaleString()}đ` : ''}]`;
     }
-    syncedLines.push(`- [x] ${raw} (✅ synced at ${timestamp})${warn}${netInfo}`);
+    let formattedStr = raw;
+    if (item) {
+      const pLink = item.person_name ? `[[${item.person_name}]] - ` : '';
+      const aLink = item.resolved_account ? `[[${item.resolved_account}]] - ` : (item.account_name ? `[[${item.account_name}]] - ` : '');
+      const tSign = item.type === 'income' || item.type === 'repayment' ? '🟢' : (item.type === 'expense' ? '🔴' : '🔄');
+      const amtStr = `${Number(item.amount).toLocaleString()}đ`;
+      formattedStr = `${pLink}${aLink}${tSign} ${amtStr} - ${item.note || raw}`;
+    }
+    syncedLines.push(`${syncedPrefix}- [x] ${formattedStr} (✅ synced at ${timestamp})${warn}${netInfo}`);
   }
 
   const newContent = [...headerLines, ...syncedLines, ...footerLines].join('\n');
