@@ -19,8 +19,17 @@ export class DebtService {
       return;
     }
 
-    if (txn.type === 'debt') {
-      // Create a new debt record
+    if (txn.type === 'debt' || (txn.type === 'expense' && txn.person_id)) {
+      // Calculate Net Final Price after cashback
+      let finalPrice = Number(txn.amount);
+      if (txn.cashback_mode === 'percent' || txn.cashback_mode === 'real_percent') {
+        const pct = txn.cashback_share_percent || 0;
+        finalPrice -= Math.round(txn.amount * pct);
+      } else if (txn.cashback_mode === 'fixed' || txn.cashback_mode === 'real_fixed') {
+        const fix = txn.cashback_share_fixed || 0;
+        finalPrice -= Math.round(fix);
+      }
+
       const role = txn.note?.toLowerCase().includes('mượn') && txn.note?.toLowerCase().includes('của') ? 'borrowed' : 'lent';
       
       const { error } = await this.supabase.from('debts').insert({
@@ -29,9 +38,9 @@ export class DebtService {
         account_id: txn.account_id,
         original_transaction_id: txn.id,
         debt_role: role,
-        original_amount: txn.amount,
+        original_amount: finalPrice,
         repaid_amount: 0,
-        remaining_amount: txn.amount,
+        remaining_amount: finalPrice,
         status: 'pending',
         notes: txn.note,
       });
@@ -39,7 +48,7 @@ export class DebtService {
       if (error) {
         console.error('Error creating debt record:', error.message);
       } else {
-        console.log(`✅ Created Debt Record for person (${txn.person_id}): ${txn.amount.toLocaleString()} VND (${role})`);
+        console.log(`✅ Created Debt Record for person (${txn.person_id}): ${finalPrice.toLocaleString()} VND (${role})`);
       }
       return;
     }

@@ -39,13 +39,18 @@ Each transaction should conform strictly to the following JSON schema:
   "note": string (the description of what was bought or done),
   "account_name": string (guessed name of account, e.g., "Vpbank", "Techcombank", "MoMo", "Tiền mặt"),
   "category_name": string (guessed category, e.g., "Ăn uống", "Mua sắm", "Di chuyển", "Cho vay"),
-  "person_name": string (optional, if the transaction involves borrowing, lending, or paying a specific person, e.g., "Nam", "Hương"),
+  "person_name": string (optional, if the transaction involves borrowing, lending, or paying a specific person, e.g., "Nam", "Hương", "Lâm"),
   "cashback_mode": string (optional: "none_back" | "percent" | "fixed" | "real_fixed" | "real_percent" | "voluntary"),
-  "cashback_share_percent": number (optional, e.g., 0.5 for 50%),
-  "cashback_share_fixed": number (optional, integer amount),
+  "cashback_share_percent": number (optional, decimal representation of percent, e.g. "-8%" -> 0.08, "50%" -> 0.5),
+  "cashback_share_fixed": number (optional, integer amount if fixed cashback, e.g. "+50k" -> 50000),
   "service_fee": number (optional, integer in VND if the note mentions fees/surcharges, e.g., "phí 50k" -> 50000),
   "is_installment": boolean (optional, true if mentioned as installment/trả góp)
 }
+
+Examples:
+- "Lâm shopee zakka 115k -8%" -> { "type": "expense", "amount": 115000, "note": "shopee zakka", "person_name": "Lâm", "cashback_mode": "percent", "cashback_share_percent": 0.08 }
+- "Nam mua đồ 200k +20k" -> { "type": "expense", "amount": 200000, "note": "mua đồ", "person_name": "Nam", "cashback_mode": "fixed", "cashback_share_fixed": 20000 }
+
 Return ONLY valid JSON array [ { ... } ]. Do not include markdown formatting or any explanations.
 `;
 
@@ -92,7 +97,7 @@ export async function processDailyLog() {
     const dir = path.dirname(monthlyFile);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     
-    const template = `# 📅 Ghi chép Chi tiêu Tháng ${d.getMonth() + 1}/${d.getFullYear()}\n\n> Ghi chép các khoản thu chi bằng văn bản tự nhiên dưới mục **Unsynced**.\n\n[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)\n\n---\n\n## Unsynced Transactions\n\n\n## Synced Transactions\n`;
+    const template = `# 📅 Ghi chép Chi tiêu Tháng ${d.getMonth() + 1}/${d.getFullYear()}\n\n[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)\n\n---\n\n> [!todo] 📥 Unsynced Transactions\n> Ghi chép các khoản thu chi bằng văn bản tự nhiên ở dưới.\n\n\n> [!success] 🔄 Synced Transactions\n> AI Daemon sẽ tự động bóc tách và chuyển các giao dịch đã đồng bộ xuống đây.\n`;
     fs.writeFileSync(monthlyFile, template, 'utf8');
   }
 
@@ -108,13 +113,13 @@ export async function processDailyLog() {
   const footerLines: string[] = [];
 
   for (const line of lines) {
-    if (line.trim().startsWith('## Unsynced Transactions')) {
+    if (line.includes('Unsynced Transactions')) {
       isUnsyncedSection = true;
       isSyncedSection = false;
       headerLines.push(line);
       continue;
     }
-    if (line.trim().startsWith('## Synced Transactions')) {
+    if (line.includes('Synced Transactions')) {
       isUnsyncedSection = false;
       isSyncedSection = true;
       syncedLines.push(line);
@@ -123,8 +128,11 @@ export async function processDailyLog() {
 
     if (isUnsyncedSection) {
       const trimmed = line.trim();
-      if (trimmed.length > 0 && !trimmed.startsWith('#') && !trimmed.startsWith('*') && !trimmed.startsWith('>') && !trimmed.startsWith('[')) {
-        unsyncedLines.push(trimmed.replace(/^-/, '').trim());
+      // Extract transactions from unsynced section
+      // Match lines that look like a list item: `- something` or `> - something`
+      const match = trimmed.match(/^>?\s*-\s+(.*)/);
+      if (match) {
+        unsyncedLines.push(match[1].trim());
       } else {
         headerLines.push(line);
       }
@@ -192,6 +200,9 @@ export async function processDailyLog() {
         .single();
       if (newAcc) accountId = newAcc.id;
     }
+    
+    // Store resolved account name for backlink formatting
+    item.resolved_account = resolvedName;
     syncWarnings.push(warningNote);
 
     let personId = null;
@@ -281,10 +292,39 @@ export async function processDailyLog() {
   }
 
   const timestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const hasTable = syncedLines.some(l => l.includes('|---|') || l.includes('| ---'));
+  
+  if (!hasTable && unsyncedLines.length > 0) {
+    syncedLines.push(`\n| ⏰ Giờ | 👤 Người | 💳 Thẻ | 📊 Loại | 💰 Số tiền | 📝 Ghi chú | 🎁 Hoàn / Phí |`);
+    syncedLines.push(`|---|---|---|---|---|---|---|`);
+  }
+
   for (let i = 0; i < unsyncedLines.length; i++) {
     const raw = unsyncedLines[i];
     const warn = syncWarnings[i] || "";
-    syncedLines.push(`- [x] ${raw} (✅ synced at ${timestamp})${warn}`);
+    const item = parsedTxns[i];
+    
+    if (!item) {
+      syncedLines.push(`| ${timestamp} | - | - | ❓ | - | ${raw} ${warn} | - |`);
+      continue;
+    }
+
+    let pLink = item.person_name ? `[[${item.person_name}]]` : '-';
+    let aLink = item.resolved_account ? `[[${item.resolved_account}]]` : (item.account_name ? `[[${item.account_name}]]` : '-');
+    let tSign = item.type === 'income' || item.type === 'repayment' ? '🟢' : (item.type === 'expense' ? '🔴' : '🔄');
+    let amtStr = `**${Number(item.amount).toLocaleString()} đ**`;
+    let noteStr = (item.note || raw) + (warn ? ` *(⚠️ ${warn})*` : '');
+    
+    let extraStr = '-';
+    if (item.cashback_share_percent || item.cashback_share_fixed || item.service_fee) {
+      const amt = Number(item.amount || 0);
+      const fee = Number(item.service_fee || 0);
+      const cb = item.cashback_share_percent ? Math.round(amt * item.cashback_share_percent) : Number(item.cashback_share_fixed || 0);
+      const net = amt - cb + fee;
+      extraStr = `Net: ${net.toLocaleString()}đ<br>CB: ${cb.toLocaleString()}đ${fee ? `<br>Fee: ${fee.toLocaleString()}đ` : ''}`;
+    }
+    
+    syncedLines.push(`| ${timestamp} | ${pLink} | ${aLink} | ${tSign} | ${amtStr} | ${noteStr} | ${extraStr} |`);
   }
 
   const newContent = [...headerLines, ...syncedLines, ...footerLines].join('\n');

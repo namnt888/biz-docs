@@ -34,9 +34,12 @@ module.exports = async (params) => {
   let catSelection = "";
   let feeStr = "0";
   let debtCycleStr = "";
+  let cbMode = "none_back";
+  let cbPercentStr = "0";
+  let cbFixedStr = "0";
+  let personName = "";
 
   if (modalFormApi && modalFormApi.openForm) {
-    // Nếu có plugin Modal Form, mở form định nghĩa sẵn
     const formResult = await modalFormApi.openForm('add_transaction_form', {
       values: {
         account_list: accOptions,
@@ -53,8 +56,11 @@ module.exports = async (params) => {
     catSelection = formResult.getValue('category') || '';
     feeStr = formResult.getValue('fee') || '0';
     debtCycleStr = formResult.getValue('debt_cycle') || '';
+    cbMode = formResult.getValue('cb_mode') || 'none_back';
+    cbPercentStr = formResult.getValue('cb_percent') || '0';
+    cbFixedStr = formResult.getValue('cb_fixed') || '0';
+    personName = formResult.getValue('person_name') || '';
   } else {
-    // Nếu chưa cài Modal Form, dùng QuickAdd Suggester & Input gốc
     const typeSug = await quickAddApi.suggester(["🔴 Chi tiêu", "🟢 Thu nhập", "🤝 Cho mượn", "🤝 Thu nợ"], ["expense", "income", "debt", "repayment"]);
     if (!typeSug) return;
     type = typeSug;
@@ -74,7 +80,23 @@ module.exports = async (params) => {
   const category_id = catSelection ? catSelection.split('[').pop().replace(']', '').trim() : null;
   const amount = Number(amtStr) || 0;
   const service_fee = Number(feeStr) || 0;
-  const final_price = amount + service_fee;
+  
+  // Calculate Cashback and Net Final Price
+  let rawPercent = Number(cbPercentStr) || 0;
+  const cashback_share_percent = rawPercent > 1 ? rawPercent / 100 : rawPercent; // 10 -> 0.1
+  const cashback_share_fixed = Number(cbFixedStr) || 0;
+  const cbAmount = cashback_share_percent > 0 ? Math.round(amount * cashback_share_percent) : cashback_share_fixed;
+  const final_price = amount - cbAmount + service_fee;
+
+  // Resolve person_id if personName is provided
+  let person_id = null;
+  if (personName) {
+    const pRes = await fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name&name=ilike.*${encodeURIComponent(personName)}*&limit=1`, { headers });
+    if (pRes.ok) {
+      const pData = await pRes.json();
+      if (pData && pData.length > 0) person_id = pData[0].id;
+    }
+  }
 
   const d = new Date();
   const currentMonthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -87,19 +109,23 @@ module.exports = async (params) => {
     amount,
     account_id,
     category_id,
+    person_id: person_id || undefined,
     note: noteStr,
-    cashback_mode: "none_back",
+    cashback_mode: cbMode,
+    cashback_share_percent: cashback_share_percent || undefined,
+    cashback_share_fixed: cashback_share_fixed || undefined,
     metadata: {
       service_fee,
       final_price,
       statement_cycle_tag,
       debt_cycle_tag,
+      person_name: personName,
       is_installment: false,
       created_via: "QuickAdd_ModalForm"
     }
   };
 
-  new Notice("🚀 Đang ghi giao dịch vào DB...");
+  new Notice("🚀 Đang ghi giao dịch vào DB Supabase...");
   const insRes = await fetch(`${SUPABASE_URL}/rest/v1/transactions`, {
     method: "POST",
     headers,
@@ -107,7 +133,21 @@ module.exports = async (params) => {
   });
 
   if (insRes.ok) {
-    new Notice(`🎉 GHI THÀNH CÔNG! Đã cập nhật số dư (${amount.toLocaleString()} VND)`);
+    // Explicitly update account balance instantly
+    const accQuery = await fetch(`${SUPABASE_URL}/rest/v1/accounts?select=current_balance&id=eq.${account_id}`, { headers });
+    if (accQuery.ok) {
+      const accData = await accQuery.json();
+      if (accData && accData.length > 0) {
+        const isPlus = type === 'income' || type === 'repayment' || type === 'refund' || type === 'transfer_in';
+        const newBal = isPlus ? Number(accData[0].current_balance) + amount : Number(accData[0].current_balance) - amount;
+        await fetch(`${SUPABASE_URL}/rest/v1/accounts?id=eq.${account_id}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ current_balance: newBal, updated_at: new Date().toISOString() })
+        });
+      }
+    }
+    new Notice(`🎉 GHI THÀNH CÔNG! [💸 Net: ${final_price.toLocaleString()}đ | 🎁 CB: ${cbAmount.toLocaleString()}đ]`);
   } else {
     const errObj = await insRes.json();
     new Notice(`❌ LỖI DB: ${errObj.message || insRes.status}`);
