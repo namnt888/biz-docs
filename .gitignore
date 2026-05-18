@@ -3,3 +3,8 @@ node_modules/
 .DS_Store
 dist/
 build/
+
+# Ignore Obsidian transient workspace files anywhere in the repo
+**/.obsidian/workspace*
+**/.obsidian/cache*
+**/.obsidian/snips*
