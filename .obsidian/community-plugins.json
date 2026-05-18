@@ -1,5 +1,10 @@
 [
   "dataview",
   "quickadd",
-  "modalforms"
+  "modalforms",
+  "table-editor-obsidian",
+  "obsidian-charts",
+  "obsidian-banners",
+  "calendar",
+  "obsidian-style-settings"
 ]

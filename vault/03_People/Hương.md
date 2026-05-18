@@ -76,7 +76,7 @@ if (res.ok) {
     });
 
     for (const [month, monthTxns] of Object.entries(byMonth)) {
-      const monthArr = monthTxns as any[];
+      const monthArr = monthTxns;
       const totalAmt = monthArr.reduce((s, t) => s + Number(t.amount), 0);
       const totalCB = monthArr.reduce((t2, t) => {
         const amt = Number(t.amount);

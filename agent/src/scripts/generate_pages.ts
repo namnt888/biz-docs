@@ -219,16 +219,14 @@ if (res.ok) {
     });
 
     for (const [month, monthTxns] of Object.entries(byMonth)) {
-      const monthArr = monthTxns as any[];
+      const monthArr = monthTxns;
       const totalAmt = monthArr.reduce((s, t) => s + Number(t.amount), 0);
       const totalCB = monthArr.reduce((t2, t) => {
         const amt = Number(t.amount);
         const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
         return t2 + cb;
-      }, 0);
-
-      dv.header(3, \`📅 [[\${month}]] — \${monthArr.length} giao dịch | Tổng: \${totalAmt.toLocaleString()} đ | CB: \${totalCB.toLocaleString()} đ\`);
-
+      }, 0);\n
+      dv.header(3, \`📅 [[\${month}]] — \${monthArr.length} giao dịch | Tổng: \${totalAmt.toLocaleString()} đ | CB: \${totalCB.toLocaleString()} đ\`);\n
       dv.table(
         ["ID", "Ngày", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
         monthArr.map(t => {
