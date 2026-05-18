@@ -170,7 +170,7 @@ export async function processDailyLog() {
   console.log(`\n--- Processing content in Today.md ---`);
   console.log(`Found ${unsyncedLines.length} unsynced transactions:`, unsyncedLines);
   console.log(`Connecting to AI Gateway (${process.env.AI_BASE_URL}) using model ${modelName}...`);
-  notifyMac('Obsidian Money', 'AI Daemon', `Đang phân tích ${unsyncedLines.length} giao dịch...`);
+  notifyMac('Obsidian Money', `AI Parsing [${modelName}]`, `Đang phân tích ${unsyncedLines.length} giao dịch...`);
 
   const parsedTxns = await parseTransactionsWithAI(unsyncedLines);
   if (!parsedTxns || !Array.isArray(parsedTxns)) {

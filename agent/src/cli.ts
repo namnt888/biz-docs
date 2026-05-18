@@ -69,9 +69,12 @@ async function interactiveMode() {
     output: process.stdout
   });
 
+  const modelName = process.env.AI_MODEL || 'claude-3-5-sonnet';
+
   console.log('\n╔════════════════════════════════════════╗');
   console.log('║  🤖  Obsidian Money CLI                ║');
   console.log('╚════════════════════════════════════════╝');
+  console.log(`🧠 AI Model Active: [${modelName}]`);
   console.log('Nhập giao dịch (natural language hoặc Sheet format)');
   console.log('Gõ "exit" hoặc Ctrl+C để thoát.\n');
   console.log('📌 Ví dụ natural: ăn trưa 55k Vpbank');

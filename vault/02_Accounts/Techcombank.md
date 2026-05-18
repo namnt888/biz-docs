@@ -1,8 +1,8 @@
 ---
 type: account
-id: 96194195-127f-45bb-8ec3-8fa4eb703875
+id: adefcef4-33f7-461a-b402-1f51b4450f7b
 ---
-# 💳 Msb Online
+# 💳 Techcombank
 
 [👈 Trở về Dashboard](../00_Dashboard/Dashboard.md)
 
