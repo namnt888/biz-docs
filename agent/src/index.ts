@@ -57,19 +57,22 @@ Each transaction should conform strictly to the following JSON schema:
 
 SHEET FORMAT SUPPORT:
 You can also parse tab-separated Google Sheet rows in the format:
-  Type[TAB]Date[TAB]Notes[TAB]Amount[TAB]%Back[TAB]ShopSource
+  Type[TAB]Date[TAB]Notes[TAB]Amount[TAB]%Back[TAB]ShopSource[TAB]Account(optional)
 Where:
   - Type: "Out" = expense, "In" = income
-  - Date: "DD-MM" or "MM-DD" format (assume current year)
+  - Date: "DD-MM" format (assume current year ${new Date().getFullYear()})
   - Amount: may use dots as thousands separator e.g. "1.971.346" = 1971346
-  - %Back: cashback percent e.g. "1,00" = 1% -> cashback_share_percent: 0.01
-  - ShopSource: use as account_name hint (e.g. "Power" = "Điện lực", "Youtube" = account is wherever you pay)
+  - %Back: cashback percent e.g. "1,00" = 1% -> cashback_share_percent: 0.01, "0,00" = 0
+  - ShopSource: the service/shop name, use as note or category hint
+  - Account (7th column, optional): explicit bank/wallet name, ALWAYS prefer this over ShopSource for account_name
+  - If no 7th column, use ShopSource as account_name
 
 Examples:
 - Natural: "Lâm shopee zakka 115k -8% Tpbank" -> { "type": "expense", "amount": 115000, "note": "shopee zakka", "person_name": "Lâm", "cashback_mode": "percent", "cashback_share_percent": 0.08, "account_name": "Tpbank" }
 - Natural: "Nam mua đồ 200k +20k Vpbank" -> { "type": "expense", "amount": 200000, "note": "mua đồ", "person_name": "Nam", "cashback_mode": "fixed", "cashback_share_fixed": 20000, "account_name": "Vpbank" }
-- Sheet row: "Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower" -> { "type": "expense", "occurred_at": "<current-year>-05-06T00:00:00Z", "amount": 1971346, "note": "Điện T4", "cashback_share_percent": 0.01, "cashback_mode": "percent", "account_name": "Power", "category_name": "Điện nước" }
-- Sheet row: "Out\t01-05\tYoutube 2026-05 [2 slots] [29,243]/6\t58.485\t0,00\tYoutube" -> { "type": "expense", "amount": 58485, "note": "Youtube 2026-05 [2 slots]", "cashback_share_percent": 0, "cashback_mode": "none_back", "account_name": "Youtube" }
+- Sheet (6 cols, no account): "Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower" -> { "type": "expense", "amount": 1971346, "note": "Điện T4", "cashback_share_percent": 0.01, "cashback_mode": "percent", "account_name": "Power", "category_name": "Điện nước" }
+- Sheet (7 cols, with account): "Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower\tTpbank" -> { "type": "expense", "amount": 1971346, "note": "Điện T4", "cashback_share_percent": 0.01, "cashback_mode": "percent", "account_name": "Tpbank", "category_name": "Điện nước" }
+- Sheet (6 cols): "Out\t01-05\tYoutube 2026-05 [2 slots] [29,243]/6\t58.485\t0,00\tYoutube" -> { "type": "expense", "amount": 58485, "note": "Youtube 2026-05 [2 slots]", "cashback_share_percent": 0, "cashback_mode": "none_back", "account_name": "Youtube" }
 
 Return ONLY valid JSON array [ { ... } ]. Do not include markdown formatting or any explanations.
 `;
@@ -170,7 +173,7 @@ export async function processDailyLog() {
   console.log(`\n--- Processing content in Today.md ---`);
   console.log(`Found ${unsyncedLines.length} unsynced transactions:`, unsyncedLines);
   console.log(`Connecting to AI Gateway (${process.env.AI_BASE_URL}) using model ${modelName}...`);
-  notifyMac('Obsidian Money', `AI Parsing [${modelName}]`, `Đang phân tích ${unsyncedLines.length} giao dịch...`);
+  notifyMac('Obsidian Money', 'AI Daemon', `Đang phân tích ${unsyncedLines.length} giao dịch...`);
 
   const parsedTxns = await parseTransactionsWithAI(unsyncedLines);
   if (!parsedTxns || !Array.isArray(parsedTxns)) {

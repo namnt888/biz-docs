@@ -41,7 +41,7 @@ const accId = dv.current().id;
 
 const [accRes, txnRes] = await Promise.all([
   fetch(\`\${SUPABASE_URL}/rest/v1/accounts?id=eq.\${accId}\`, { headers }),
-  fetch(\`\${SUPABASE_URL}/rest/v1/transactions?account_id=eq.\${accId}&status=eq.posted\`, { headers })
+  fetch(\`\${SUPABASE_URL}/rest/v1/transactions?account_id=eq.\${accId}\`, { headers })
 ]);
 
 if (accRes.ok && txnRes.ok) {
@@ -103,17 +103,16 @@ const SUPABASE_ANON_KEY = "${SUPABASE_ANON_KEY}";
 const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': \`Bearer \${SUPABASE_ANON_KEY}\` };
 
 const accId = dv.current().id;
-const res = await fetch(\`\${SUPABASE_URL}/rest/v1/transactions?account_id=eq.\${accId}&order=occurred_at.desc&limit=20&select=*,people(name)\`, { headers });
+const res = await fetch(\`\${SUPABASE_URL}/rest/v1/transactions?account_id=eq.\${accId}&order=occurred_at.desc&limit=20\`, { headers });
 
 if (res.ok) {
   const txns = await res.json();
-  dv.table(["ID", "Tháng", "Ngày", "Người", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
+  dv.table(["ID", "Kỳ", "Ngày", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
     const sign = isPlus ? "🟢 +" : "🔴 -";
     const d = new Date(t.occurred_at);
     const mStr = \`\${d.getFullYear()}-\${String(d.getMonth() + 1).padStart(2, '0')}\`;
     const shortId = t.id ? t.id.substring(0, 5) : '-';
-    const personLink = t.people && t.people.name ? \`[[\${t.people.name}]]\` : '-';
     const amt = Number(t.amount);
     const cbPct = Number(t.cashback_share_percent || 0);
     const cbFixed = Number(t.cashback_share_fixed || 0);
@@ -124,7 +123,6 @@ if (res.ok) {
       \`\\\`\${shortId}\\\`\`,
       \`[[\${mStr}]]\`,
       d.toLocaleDateString('vi-VN'),
-      personLink,
       \`\${sign}\${t.type}\`,
       \`**\${amt.toLocaleString()} đ**\`,
       cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
@@ -140,9 +138,10 @@ if (res.ok) {
 }
 
 // ──────────────────────────────────────────────
-// PEOPLE PAGE TEMPLATE
+// PEOPLE INDEX PAGE (main page with debt + year links)
 // ──────────────────────────────────────────────
-function peoplePage(p: { id: string; name: string }) {
+function peopleIndexPage(p: { id: string; name: string }, years: number[]) {
+  const yearLinks = years.map(y => `- [[${p.name}/${y}|📅 ${y}]]`).join('\n');
   return `---
 type: person
 id: ${p.id}
@@ -151,7 +150,13 @@ id: ${p.id}
 
 [👈 Trở về Debt Center](../00_Dashboard/Debt_Center.md)
 
-## 🤝 Tổng quan Công nợ (Theo Kỳ)
+## 📂 Giao dịch theo Năm
+
+${yearLinks || '_Chưa có giao dịch nào._'}
+
+---
+
+## 🤝 Tổng quan Công nợ
 
 \`\`\`dataviewjs
 const SUPABASE_URL = "${SUPABASE_URL}";
@@ -162,130 +167,121 @@ const personId = dv.current().id;
 const res = await fetch(\`\${SUPABASE_URL}/rest/v1/debts?person_id=eq.\${personId}&order=occurred_at.desc\`, { headers });
 
 if (res.ok) {
-  const debts = await res.json();
+  const rawDebts = await res.json();
+  // Dedup by ID to prevent duplicate display
+  const seen = new Set();
+  const debts = rawDebts.filter(d => { if (seen.has(d.id)) return false; seen.add(d.id); return true; });
+
   if (debts.length > 0) {
-    // Summary row
     const totalOrig = debts.reduce((s, d) => s + Number(d.original_amount), 0);
     const totalRepaid = debts.reduce((s, d) => s + Number(d.repaid_amount), 0);
     const totalRemain = debts.reduce((s, d) => s + Number(d.remaining_amount), 0);
     dv.paragraph(\`📊 **Tổng nợ:** \${totalOrig.toLocaleString()} đ &nbsp;|&nbsp; **Đã trả:** \${totalRepaid.toLocaleString()} đ &nbsp;|&nbsp; **Còn lại:** \${totalRemain.toLocaleString()} đ\`);
 
-    // Group by cycle tag to prevent duplicate individual rows
-    const byCycle = {};
-    debts.forEach(d => {
+    dv.table(["Kỳ (Cycle)", "Loại", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Trạng thái"], debts.map(d => {
+      const roleStr = d.debt_role === 'lent' ? "🟢 Cho vay" : "🔴 Đi mượn";
+      let statusStr = "⚪ Settled";
+      if (d.status === 'pending') statusStr = "🔴 Pending";
+      if (d.status === 'partial') statusStr = "🟠 Partial";
       const dt = new Date(d.occurred_at);
       const mStr = \`\${dt.getFullYear()}-\${String(dt.getMonth() + 1).padStart(2, '0')}\`;
-      const cycle = mStr; // use month string as cycle identifier
-      if (!byCycle[cycle]) {
-        byCycle[cycle] = {
-          cycle: cycle,
-          mLink: \`[[\${mStr}]]\`,
-          roleStr: d.debt_role === 'lent' ? "🟢 Cho vay" : "🔴 Đi mượn",
-          orig: 0,
-          repaid: 0,
-          remain: 0,
-          status: "⚪ Settled",
-          count: 0
-        };
-      }
-      byCycle[cycle].orig += Number(d.original_amount);
-      byCycle[cycle].repaid += Number(d.repaid_amount);
-      byCycle[cycle].remain += Number(d.remaining_amount);
-      byCycle[cycle].count += 1;
-      if (d.status === 'pending' || d.status === 'partial') {
-        byCycle[cycle].status = d.status === 'pending' ? "🔴 Pending" : "🟠 Partial";
-      }
-    });
-
-    dv.table(["Kỳ (Cycle)", "Link Tháng", "Loại", "Số mục", "Tổng nợ", "Đã trả", "Còn lại", "Trạng thái"], Object.values(byCycle).map(c => {
-      const item = c;
-      return [
-        \`**\${item.cycle}**\`,
-        item.mLink,
-        item.roleStr,
-        \`\${item.count} khoản\`,
-        \`\${item.orig.toLocaleString()} đ\`,
-        \`\${item.repaid.toLocaleString()} đ\`,
-        \`**\${item.remain.toLocaleString()} đ**\`,
-        item.status
-      ];
+      return [mStr, roleStr, d.notes || "-",
+        \`\${Number(d.original_amount).toLocaleString()} đ\`,
+        \`\${Number(d.repaid_amount).toLocaleString()} đ\`,
+        \`**\${Number(d.remaining_amount).toLocaleString()} đ**\`,
+        statusStr];
     }));
   } else {
     dv.paragraph("Không có công nợ nào với người này. ✅");
   }
 }
 \`\`\`
+`;
+}
 
-## 📜 Giao dịch liên quan (Phân cấp Năm > Tháng)
+// ──────────────────────────────────────────────
+// PEOPLE YEAR PAGE (one page per year with transactions)
+// ──────────────────────────────────────────────
+function peopleYearPage(p: { id: string; name: string }, year: number) {
+  return `---
+type: person_year
+person_id: ${p.id}
+person_name: ${p.name}
+year: ${year}
+---
+# 👤 [[${p.name}]] — ${year}
 
-> [!tip] Mẹo: Bấm mũi tên lề trái cạnh các dòng tiêu đề (Năm / Tháng) để thu gọn (Collapse) hoặc mở rộng (Expand)!
+[← Trở về trang chính](../${p.name}.md)
+
+## 📜 Giao dịch ${year} (phân theo tháng)
 
 \`\`\`dataviewjs
 const SUPABASE_URL = "${SUPABASE_URL}";
 const SUPABASE_ANON_KEY = "${SUPABASE_ANON_KEY}";
 const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': \`Bearer \${SUPABASE_ANON_KEY}\` };
 
-const personId = dv.current().id;
-const res = await fetch(\`\${SUPABASE_URL}/rest/v1/transactions?person_id=eq.\${personId}&order=occurred_at.desc&select=*,accounts!transactions_account_id_fkey(name)\`, { headers });
+const personId = dv.current().person_id;
+const year = dv.current().year;
+const startDate = \`\${year}-01-01T00:00:00Z\`;
+const endDate = \`\${year}-12-31T23:59:59Z\`;
+
+const res = await fetch(
+  \`\${SUPABASE_URL}/rest/v1/transactions?person_id=eq.\${personId}&occurred_at=gte.\${startDate}&occurred_at=lte.\${endDate}&order=occurred_at.desc\`,
+  { headers }
+);
 
 if (res.ok) {
   const txns = await res.json();
   if (txns.length === 0) {
-    dv.paragraph("Không có giao dịch.");
+    dv.paragraph("Không có giao dịch nào trong năm này.");
   } else {
-    // Group by Year then by Month
-    const byYear = {};
+    // Group by month
+    const byMonth = {};
     txns.forEach(t => {
       const d = new Date(t.occurred_at);
-      const yStr = String(d.getFullYear());
       const mStr = \`\${d.getFullYear()}-\${String(d.getMonth() + 1).padStart(2, '0')}\`;
-      if (!byYear[yStr]) byYear[yStr] = {};
-      if (!byYear[yStr][mStr]) byYear[yStr][mStr] = [];
-      byYear[yStr][mStr].push(t);
+      if (!byMonth[mStr]) byMonth[mStr] = [];
+      byMonth[mStr].push(t);
     });
 
-    for (const [year, monthMap] of Object.entries(byYear)) {
-      dv.header(2, \`🗓️ Năm \${year}\`);
-      
-      for (const [month, monthTxns] of Object.entries(monthMap)) {
-        const monthArr = monthTxns;
-        const totalAmt = monthArr.reduce((s, t) => s + Number(t.amount), 0);
-        const totalCB = monthArr.reduce((t2, t) => {
+    const months = Object.keys(byMonth).sort().reverse();
+    for (const month of months) {
+      const monthTxns = byMonth[month];
+      const totalAmt = monthTxns.reduce((s, t) => s + Number(t.amount), 0);
+      const totalCB = monthTxns.reduce((s, t) => {
+        const amt = Number(t.amount);
+        const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
+        return s + cb;
+      }, 0);
+      const totalNet = totalAmt - totalCB;
+
+      dv.header(3, \`📅 [[\${month}]] — \${monthTxns.length} txn | 💰 \${totalAmt.toLocaleString()} đ | 🎁 CB: \${totalCB.toLocaleString()} đ | Net: \${totalNet.toLocaleString()} đ\`);
+
+      dv.table(
+        ["ID", "Ngày", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
+        monthTxns.map(t => {
+          const d = new Date(t.occurred_at);
+          const shortId = t.id ? t.id.substring(0, 5) : '-';
           const amt = Number(t.amount);
-          const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
-          return t2 + cb;
-        }, 0);
-
-        dv.header(3, \`📅 [[\${month}]] — \${monthArr.length} giao dịch | Tổng: \${totalAmt.toLocaleString()} đ | CB: \${totalCB.toLocaleString()} đ\`);
-
-        dv.table(
-          ["ID", "Ngày", "Tài khoản", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
-          monthArr.map(t => {
-            const d = new Date(t.occurred_at);
-            const shortId = t.id ? t.id.substring(0, 5) : '-';
-            const accLink = t.accounts && t.accounts.name ? \`[[\${t.accounts.name}]]\` : '-';
-            const amt = Number(t.amount);
-            const cbPct = Number(t.cashback_share_percent || 0);
-            const cbFixed = Number(t.cashback_share_fixed || 0);
-            const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
-            const fee = Number(t.metadata?.service_fee || 0);
-            const net = amt - cbSum + fee;
-            const sign = ['income','repayment','refund','transfer_in'].includes(t.type) ? '🟢 +' : '🔴 -';
-            return [
-              \`\\\`\${shortId}\\\`\`,
-              d.toLocaleDateString('vi-VN'),
-              accLink,
-              \`\${sign}\${t.type}\`,
-              \`**\${amt.toLocaleString()} đ**\`,
-              cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
-              cbFixed > 0 ? \`\${cbFixed.toLocaleString()} đ\` : '-',
-              cbSum > 0 ? \`\${cbSum.toLocaleString()} đ\` : '-',
-              \`**\${net.toLocaleString()} đ**\`,
-              t.note || "-"
-            ];
-          })
-        );
-      }
+          const cbPct = Number(t.cashback_share_percent || 0);
+          const cbFixed = Number(t.cashback_share_fixed || 0);
+          const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
+          const fee = Number(t.metadata?.service_fee || 0);
+          const net = amt - cbSum + fee;
+          const sign = ['income','repayment','refund','transfer_in'].includes(t.type) ? '🟢 +' : '🔴 -';
+          return [
+            \`\\\`\${shortId}\\\`\`,
+            d.toLocaleDateString('vi-VN'),
+            \`\${sign}\${t.type}\`,
+            \`**\${amt.toLocaleString()} đ**\`,
+            cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
+            cbFixed > 0 ? \`\${cbFixed.toLocaleString()} đ\` : '-',
+            cbSum > 0 ? \`\${cbSum.toLocaleString()} đ\` : '-',
+            \`**\${net.toLocaleString()} đ**\`,
+            t.note || "-"
+          ];
+        })
+      );
     }
   }
 }
@@ -306,7 +302,7 @@ async function generate() {
       const safeName = acc.name.replace(/\//g, '-');
       const filePath = path.join(accountsDir, `${safeName}.md`);
       fs.writeFileSync(filePath, accountPage(acc), 'utf8');
-      console.log(`Created/Updated ${filePath}`);
+      console.log(`✅ Account: ${safeName}.md`);
     }
   }
 
@@ -314,13 +310,39 @@ async function generate() {
     const pplData = await pplRes.json();
     for (const p of pplData) {
       const safeName = p.name.replace(/\//g, '-');
-      const filePath = path.join(peopleDir, `${safeName}.md`);
-      fs.writeFileSync(filePath, peoplePage(p), 'utf8');
-      console.log(`Created/Updated ${filePath}`);
+      
+      // Fetch transactions to determine which years exist
+      const txnRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${p.id}&select=occurred_at&order=occurred_at.desc`,
+        { headers }
+      );
+      
+      let years: number[] = [];
+      if (txnRes.ok) {
+        const txns = await txnRes.json();
+        const yearSet = new Set<number>(txns.map((t: any) => new Date(t.occurred_at).getFullYear()));
+        years = Array.from(yearSet).sort().reverse();
+      }
+
+      // Create People sub-folder for year pages
+      const personDir = path.join(peopleDir, safeName);
+      if (!fs.existsSync(personDir)) fs.mkdirSync(personDir, { recursive: true });
+
+      // Write main index page
+      const indexPath = path.join(peopleDir, `${safeName}.md`);
+      fs.writeFileSync(indexPath, peopleIndexPage(p, years), 'utf8');
+      console.log(`✅ People index: ${safeName}.md (${years.length} năm: ${years.join(', ')})`);
+
+      // Write year pages
+      for (const year of years) {
+        const yearPath = path.join(personDir, `${year}.md`);
+        fs.writeFileSync(yearPath, peopleYearPage(p, year), 'utf8');
+        console.log(`   📅 Year page: ${safeName}/${year}.md`);
+      }
     }
   }
 
-  console.log("Done generating Obsidian Ecosystem Pages!");
+  console.log("\n✅ Done generating Obsidian Ecosystem Pages!");
 }
 
 generate().catch(console.error);

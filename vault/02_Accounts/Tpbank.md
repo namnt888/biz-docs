@@ -17,7 +17,7 @@ const accId = dv.current().id;
 
 const [accRes, txnRes] = await Promise.all([
   fetch(`${SUPABASE_URL}/rest/v1/accounts?id=eq.${accId}`, { headers }),
-  fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${accId}&status=eq.posted`, { headers })
+  fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${accId}`, { headers })
 ]);
 
 if (accRes.ok && txnRes.ok) {
@@ -79,17 +79,16 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
 
 const accId = dv.current().id;
-const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${accId}&order=occurred_at.desc&limit=20&select=*,people(name)`, { headers });
+const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${accId}&order=occurred_at.desc&limit=20`, { headers });
 
 if (res.ok) {
   const txns = await res.json();
-  dv.table(["ID", "Tháng", "Ngày", "Người", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
+  dv.table(["ID", "Kỳ", "Ngày", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
     const sign = isPlus ? "🟢 +" : "🔴 -";
     const d = new Date(t.occurred_at);
     const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const shortId = t.id ? t.id.substring(0, 5) : '-';
-    const personLink = t.people && t.people.name ? `[[${t.people.name}]]` : '-';
     const amt = Number(t.amount);
     const cbPct = Number(t.cashback_share_percent || 0);
     const cbFixed = Number(t.cashback_share_fixed || 0);
@@ -100,7 +99,6 @@ if (res.ok) {
       `\`${shortId}\``,
       `[[${mStr}]]`,
       d.toLocaleDateString('vi-VN'),
-      personLink,
       `${sign}${t.type}`,
       `**${amt.toLocaleString()} đ**`,
       cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
