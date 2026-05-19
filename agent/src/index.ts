@@ -135,15 +135,13 @@ export async function processDailyLog(targetFile?: string) {
     monthStr = `${year}-${String(month).padStart(2, '0')}`;
     monthlyFile = path.resolve(vaultPath, '01_Monthly_Logs', `${monthStr}.md`);
   }
+  
   if (!fs.existsSync(monthlyFile)) {
     console.log(`Creating new monthly log for ${monthStr}...`);
     const dir = path.dirname(monthlyFile);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     
     const mStr = String(month).padStart(2, '0');
-    const SUPABASE_URL = process.env.SUPABASE_URL || "https://fyrgmsfsqzofqduiidrj.supabase.co";
-    const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
-    
     const template = `---
 type: monthly_log
 month: "${monthStr}"
@@ -166,8 +164,8 @@ month: "${monthStr}"
 ## 🔄 Synced Transactions
 
 \`\`\`dataviewjs
-const SUPABASE_URL = "${SUPABASE_URL}";
-const SUPABASE_ANON_KEY = "${SUPABASE_ANON_KEY}";
+const SUPABASE_URL = "${process.env.SUPABASE_URL || 'https://fyrgmsfsqzofqduiidrj.supabase.co'}";
+const SUPABASE_ANON_KEY = "${process.env.SUPABASE_ANON_KEY || ''}";
 const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': \`Bearer \${SUPABASE_ANON_KEY}\` };
 
 const monthVal = dv.current().month;

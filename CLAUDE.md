@@ -95,3 +95,16 @@ The daemon toast notifications will appear on macOS:
 2. "Đã đồng bộ thành công X giao dịch." (done)
 
 No manual action needed. Just paste and wait ~5 seconds.
+
+## AUTOMATED AGENT WORKFLOW (FOR AGENTS)
+When the user asks you to "add a transaction", "test transaction sync", or "sync monthly logs", you must perform the following steps autonomously:
+1. **Write to File**: Append the transaction lines to `vault/01_Monthly_Logs/YYYY-MM.md` under the `## 📥 Unsynced Transactions` section.
+2. **Check Daemon Status**: Run `ps aux | grep "tsx src/daemon.ts"` to check if the daemon is running.
+3. **Handle Daemon/Sync**:
+   - If the daemon is NOT running, start it in the background: `cd agent && npm run watch-vault` (asynchronously).
+   - In all cases, to ensure immediate execution, trigger a manual sync of the file by executing:
+     ```bash
+     cd agent && npx tsx -e "import { processDailyLog } from './src/index'; processDailyLog('../vault/01_Monthly_Logs/YYYY-MM.md').catch(console.error);"
+     ```
+4. **Verify**: Read the monthly log file again to confirm that the transactions have been successfully cleared from the Unsynced section and are now rendered in the Synced section.
+
