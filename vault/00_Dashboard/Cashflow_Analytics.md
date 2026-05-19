@@ -2,7 +2,7 @@
 
 > [!NOTE] Dữ liệu thu chi được tổng hợp theo thời gian thực từ Supabase.
 
-[👈 Trở về Dashboard](Dashboard.md)
+[👈 Trở về Dashboard](Dashboard.md) | [👤 Báo cáo của tôi](My_Report.md) | [🤝 Trung tâm Công nợ](Debt_Center.md) | [🎁 Quản lý Hoàn tiền](Cashback_Center.md)
 
 ---
 
@@ -48,13 +48,17 @@ try {
     }));
     
     dv.header(3, "📝 Ghi chép giao dịch gần đây");
-    dv.table(["Thời gian", "Phân loại", "Số tiền", "Ghi chú", "Danh mục"], txns.slice(0, 10).map(t => [
-      new Date(t.occurred_at).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      t.type.toUpperCase(),
-      `**${Number(t.amount).toLocaleString()} VND**`,
-      t.note || "-",
-      t.metadata?.category_name || "-"
-    ]));
+    dv.table(["Loại", "Thời gian", "Số tiền", "Ghi chú", "Danh mục"], txns.slice(0, 10).map(t => {
+      const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
+      const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
+      return [
+        typeLabel,
+        new Date(t.occurred_at).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        `**${Number(t.amount).toLocaleString()} VND**`,
+        t.note || "-",
+        t.metadata?.category_name || "-"
+      ];
+    }));
   }
 } catch (err) {
   dv.paragraph("❌ Lỗi: " + err.message);

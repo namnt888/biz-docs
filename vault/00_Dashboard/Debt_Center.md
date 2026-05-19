@@ -2,7 +2,7 @@
 
 > [!NOTE] Bảng vị thế ròng (Net Position) cho biết bạn đang dương tiền hay âm tiền với từng đối tác/bạn bè.
 
-[👈 Trở về Dashboard](Dashboard.md)
+[👈 Trở về Dashboard](Dashboard.md) | [👤 Báo cáo của tôi](My_Report.md) | [💸 Phân tích Thu Chi](Cashflow_Analytics.md) | [🎁 Quản lý Hoàn tiền](Cashback_Center.md)
 
 ---
 
@@ -56,7 +56,7 @@ try {
       else netStr = "⚪ Tất toán (0 VND)";
       
       return [
-        `**${p.name}**`,
+        `**[[${p.name}]]**`,
         `${p.lent.toLocaleString()} VND`, `${p.repaidLent.toLocaleString()} VND`,
         `${p.borrowed.toLocaleString()} VND`, `${p.repaidBorrow.toLocaleString()} VND`,
         netStr
@@ -88,10 +88,10 @@ try {
     const people = await peopleRes.json();
     const peopleMap = Object.fromEntries(people.map(p => [p.id, p.name]));
     
-    dv.table(["Thời gian phát sinh", "Đối tác", "Phân loại", "Ghi chú", "Tổng số tiền", "Đã trả", "Còn nợ"], debts.map(d => [
+    dv.table(["Loại", "Thời gian phát sinh", "Đối tác", "Ghi chú", "Tổng số tiền", "Đã trả", "Còn nợ"], debts.map(d => [
+      d.debt_role === 'lent' ? '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>' : '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>',
       new Date(d.occurred_at).toLocaleDateString('vi-VN'),
-      `**${peopleMap[d.person_id] || "Unknown"}**`,
-      d.debt_role === 'lent' ? "🟢 Cho vay" : "🔴 Đi mượn",
+      `**[[${peopleMap[d.person_id] || "Unknown"}]]**`,
       d.notes || "-",
       `${Number(d.original_amount).toLocaleString()} VND`,
       `${Number(d.repaid_amount).toLocaleString()} VND`,

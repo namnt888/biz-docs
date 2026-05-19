@@ -1,8 +1,8 @@
 ---
 type: account
-id: 58c7e77a-e8c2-4a3c-b5a6-5914c22fe873
+id: adefcef4-33f7-461a-b402-1f51b4450f7b
 ---
-# 💳 MoMo
+# 💳 Techcombank
 
 [👈 Trở về Dashboard](../00_Dashboard/Dashboard.md)
 

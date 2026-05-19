@@ -7,7 +7,8 @@
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "watch-vault": "tsx src/daemon.ts",
-    "generate-pages": "tsc --esModuleInterop src/scripts/generate_pages.ts && node src/scripts/generate_pages.js"
+    "generate-pages": "tsc --esModuleInterop src/scripts/generate_pages.ts && node src/scripts/generate_pages.js",
+    "cli": "tsx src/cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.1",

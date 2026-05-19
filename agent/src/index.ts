@@ -6,6 +6,13 @@ import * as path from 'path';
 import WebSocket from 'ws';
 import { CashbackService } from './services/cashback';
 import { DebtService } from './services/debt';
+import { exec } from 'child_process';
+
+const notifyMac = (title: string, subtitle: string, message: string) => {
+  exec(`osascript -e 'display notification "${message}" with title "${title}" subtitle "${subtitle}"'`, (err) => {
+    if (err) console.error("Notification error:", err);
+  });
+};
 
 dotenv.config();
 
@@ -31,36 +38,58 @@ const debtService = new DebtService(supabase);
 const SYSTEM_PROMPT = `
 You are a financial transaction parsing AI agent for 'Obsidian Money'.
 Your job is to parse natural language spending/income inputs into a structured JSON array.
+
 Each transaction should conform strictly to the following JSON schema:
 {
-  "occurred_at": "ISO-8601 timestamp (use current time if not specified)",
+  "occurred_at": "ISO-8601 timestamp (use current time if not specified, try to infer date from context like '06-05' -> current year)",
   "type": "expense" | "income" | "transfer_in" | "transfer_out" | "cashback" | "debt" | "repayment",
-  "amount": number (integer, positive absolute value in VND, e.g., 45k = 45000, 500k = 500000),
+  "amount": number (integer, positive absolute value in VND, e.g., 45k = 45000, 500k = 500000, "1.971.346" = 1971346),
   "note": string (the description of what was bought or done),
-  "account_name": string (guessed name of account, e.g., "Vpbank", "Techcombank", "MoMo", "Tiền mặt"),
-  "category_name": string (guessed category, e.g., "Ăn uống", "Mua sắm", "Di chuyển", "Cho vay"),
-  "person_name": string (optional, if the transaction involves borrowing, lending, or paying a specific person, e.g., "Nam", "Hương", "Lâm"),
+  "account_name": string (guessed name of account, e.g., "Vpbank", "Techcombank", "MoMo", "Tiền mặt". Use ShopSource column as account hint if present),
+  "category_name": string (guessed category, e.g., "Ăn uống", "Mua sắm", "Di chuyển", "Cho vay", "Điện nước"),
+  "person_name": string (optional, if the transaction involves a person),
   "cashback_mode": string (optional: "none_back" | "percent" | "fixed" | "real_fixed" | "real_percent" | "voluntary"),
-  "cashback_share_percent": number (optional, decimal representation of percent, e.g. "-8%" -> 0.08, "50%" -> 0.5),
-  "cashback_share_fixed": number (optional, integer amount if fixed cashback, e.g. "+50k" -> 50000),
-  "service_fee": number (optional, integer in VND if the note mentions fees/surcharges, e.g., "phí 50k" -> 50000),
+  "cashback_share_percent": number (optional, decimal representation of percent, e.g. "-8%" -> 0.08, "1,00" in % column -> 0.01),
+  "cashback_share_fixed": number (optional, integer amount if fixed cashback),
+  "service_fee": number (optional, integer in VND if the note mentions fees/surcharges),
   "is_installment": boolean (optional, true if mentioned as installment/trả góp)
 }
 
+SHEET FORMAT SUPPORT:
+You can also parse tab-separated Google Sheet rows in the format:
+  Type[TAB]Date[TAB]Notes[TAB]Amount[TAB]%Back[TAB]ShopSource[TAB]Account(optional)
+Where:
+  - Type: "Out" = expense, "In" = income
+  - Date: "DD-MM" format (assume current year ${new Date().getFullYear()})
+  - Amount: may use dots as thousands separator e.g. "1.971.346" = 1971346
+  - %Back: cashback percent e.g. "1,00" = 1% -> cashback_share_percent: 0.01, "0,00" = 0
+  - ShopSource: the service/shop name, use as note or category hint
+  - Account (7th column, optional): explicit bank/wallet name, ALWAYS prefer this over ShopSource for account_name
+  - If no 7th column, use ShopSource as account_name
+
 Examples:
-- "Lâm shopee zakka 115k -8%" -> { "type": "expense", "amount": 115000, "note": "shopee zakka", "person_name": "Lâm", "cashback_mode": "percent", "cashback_share_percent": 0.08 }
-- "Nam mua đồ 200k +20k" -> { "type": "expense", "amount": 200000, "note": "mua đồ", "person_name": "Nam", "cashback_mode": "fixed", "cashback_share_fixed": 20000 }
+- Natural: "Lâm shopee zakka 115k -8% Tpbank" -> { "type": "expense", "amount": 115000, "note": "shopee zakka", "person_name": "Lâm", "cashback_mode": "percent", "cashback_share_percent": 0.08, "account_name": "Tpbank" }
+- Natural: "Nam mua đồ 200k +20k Vpbank" -> { "type": "expense", "amount": 200000, "note": "mua đồ", "person_name": "Nam", "cashback_mode": "fixed", "cashback_share_fixed": 20000, "account_name": "Vpbank" }
+- Sheet (6 cols, no account): "Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower" -> { "type": "expense", "amount": 1971346, "note": "Điện T4", "cashback_share_percent": 0.01, "cashback_mode": "percent", "account_name": "Power", "category_name": "Điện nước" }
+- Sheet (7 cols, with account): "Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower\tTpbank" -> { "type": "expense", "amount": 1971346, "note": "Điện T4", "cashback_share_percent": 0.01, "cashback_mode": "percent", "account_name": "Tpbank", "category_name": "Điện nước" }
+- Sheet (6 cols): "Out\t01-05\tYoutube 2026-05 [2 slots] [29,243]/6\t58.485\t0,00\tYoutube" -> { "type": "expense", "amount": 58485, "note": "Youtube 2026-05 [2 slots]", "cashback_share_percent": 0, "cashback_mode": "none_back", "account_name": "Youtube" }
+- Mixed (Person + Account + Sheet): "Lâm Tpbank Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower" -> { "type": "expense", "amount": 1971346, "note": "Điện T4", "person_name": "Lâm", "account_name": "Tpbank", "cashback_share_percent": 0.01, "cashback_mode": "percent", "category_name": "Điện nước" }
+- Mixed: "My Tpbank Out\t06-05\tĐiện T4\t1.971.346\t1,00\tPower" -> { "type": "expense", "amount": 1971346, "note": "Điện T4", "person_name": "My", "account_name": "Tpbank", "cashback_share_percent": 0.01, "cashback_mode": "percent" }
 
 Return ONLY valid JSON array [ { ... } ]. Do not include markdown formatting or any explanations.
 `;
 
-async function parseTransactionsWithAI(lines: string[]) {
+async function parseTransactionsWithAI(lines: string[], fileMonthContext?: string) {
+  let systemPromptWithContext = SYSTEM_PROMPT;
+  if (fileMonthContext) {
+    systemPromptWithContext += `\n\nCRITICAL CONTEXT: The transactions you are parsing belong to the monthly log for the period "${fileMonthContext}". Any relative or DD-MM dates (e.g., '15-06', '08/06') MUST be parsed with the year and month from "${fileMonthContext}" (i.e. year: ${fileMonthContext.substring(0, 4)}, month: ${fileMonthContext.substring(5, 7)}). Do NOT default to the current runtime year unless the text explicitly states a different year.`;
+  }
   const promptText = `Parse the following raw lines into a JSON array:\n` + lines.join('\n');
   try {
     const response = await openai.chat.completions.create({
       model: modelName,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPromptWithContext },
         { role: 'user', content: promptText },
       ],
       temperature: 0.1,
@@ -86,72 +115,270 @@ async function parseTransactionsWithAI(lines: string[]) {
   }
 }
 
-export async function processDailyLog() {
+export async function processDailyLog(targetFile?: string) {
   const vaultPath = process.env.OBSIDIAN_VAULT_PATH || '../vault';
-  const d = new Date();
-  const currentMonthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  const monthlyFile = path.resolve(vaultPath, '01_Monthly_Logs', `${currentMonthStr}.md`);
+  let monthlyFile = targetFile;
+  let year: number = 0;
+  let month: number = 0;
+  let monthStr: string = "";
+
+  if (monthlyFile) {
+    const basename = path.basename(monthlyFile, '.md');
+    const parts = basename.split('-');
+    if (parts.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
+      year = parseInt(parts[0]);
+      month = parseInt(parts[1]);
+      monthStr = basename;
+    }
+  }
+
+  if (!monthlyFile || !year || !month) {
+    const d = new Date();
+    year = d.getFullYear();
+    month = d.getMonth() + 1;
+    monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    monthlyFile = path.resolve(vaultPath, '01_Monthly_Logs', `${monthStr}.md`);
+  }
   
   if (!fs.existsSync(monthlyFile)) {
-    console.log(`Creating new monthly log for ${currentMonthStr}...`);
+    console.log(`Creating new monthly log for ${monthStr}...`);
     const dir = path.dirname(monthlyFile);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     
-    const template = `# 📅 Ghi chép Chi tiêu Tháng ${d.getMonth() + 1}/${d.getFullYear()}\n\n[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)\n\n---\n\n> [!todo] 📥 Unsynced Transactions\n> Ghi chép các khoản thu chi bằng văn bản tự nhiên ở dưới.\n\n\n> [!success] 🔄 Synced Transactions\n> AI Daemon sẽ tự động bóc tách và chuyển các giao dịch đã đồng bộ xuống đây.\n`;
+    const mStr = String(month).padStart(2, '0');
+    const template = `---
+type: monthly_log
+month: "${monthStr}"
+---
+# 📅 Ghi chép Chi tiêu Tháng ${mStr}/${year}
+
+> Ghi chép các khoản thu chi bằng văn bản tự nhiên dưới mục **Unsynced**. Bạn có thể chỉ định tài khoản, kỳ nợ hoặc phí (Vd: \`- ăn trưa 55k Vpbank phí 2k\`).
+> **⚡ Bấm phím tắt Modal Form để nhập qua giao diện trực quan gốc của Obsidian.**
+
+[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [👤 Báo cáo của tôi](../00_Dashboard/My_Report.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)
+
+---
+
+## 📥 Unsynced Transactions
+
+> [!todo] Gõ hoặc paste các giao dịch chưa đồng bộ vào đây:
+
+## ⚡ Recent Added (Vừa thêm gần đây)
+
+\`\`\`dataviewjs
+const SUPABASE_URL = "${process.env.SUPABASE_URL || 'https://fyrgmsfsqzofqduiidrj.supabase.co'}";
+const SUPABASE_ANON_KEY = "${process.env.SUPABASE_ANON_KEY || ''}";
+const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': \`Bearer \${SUPABASE_ANON_KEY}\` };
+
+const [txnRes, peopleRes, accRes] = await Promise.all([
+  fetch(\`\${SUPABASE_URL}/rest/v1/transactions?order=created_at.desc&limit=5\`, { headers }),
+  fetch(\`\${SUPABASE_URL}/rest/v1/people?select=id,name\`, { headers }),
+  fetch(\`\${SUPABASE_URL}/rest/v1/accounts?select=id,name\`, { headers })
+]);
+
+if (txnRes.ok && peopleRes.ok && accRes.ok) {
+  const txns = await txnRes.json();
+  const people = await peopleRes.json();
+  const accounts = await accRes.json();
+  const peopleMap = Object.fromEntries(people.map(p => [p.id, p.name]));
+  const accMap = Object.fromEntries(accounts.map(a => [a.id, a.name]));
+
+  if (txns.length > 0) {
+    dv.table(
+      ["ID", "Ngày GD", "Thời gian Thêm", "Người", "Tài khoản", "Loại", "Số tiền", "% CB", "Final Price", "Ghi chú"],
+      txns.map(t => {
+        const d = new Date(t.occurred_at);
+        const c = new Date(t.created_at);
+        const shortId = t.id ? t.id.substring(0, 5) : '-';
+        const amt = Number(t.amount);
+        const cbPct = Number(t.cashback_share_percent || 0);
+        const cbFixed = Number(t.cashback_share_fixed || 0);
+        const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
+        const fee = Number(t.metadata?.service_fee || 0);
+        const net = amt - cbSum + fee;
+        const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
+        const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
+        const pLink = peopleMap[t.person_id] ? \`[[\${peopleMap[t.person_id]}]]\` : '-';
+        const accLink = accMap[t.account_id] ? \`[[\${accMap[t.account_id]}]]\` : '-';
+
+        return [
+          \`\\\`\${shortId}\\\`\`,
+          d.toLocaleDateString('vi-VN'),
+          c.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          pLink,
+          accLink,
+          typeLabel,
+          \`**\${amt.toLocaleString()} đ**\`,
+          cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
+          \`**\${net.toLocaleString()} đ**\`,
+          t.note || "-"
+        ];
+      })
+    );
+  } else {
+    dv.paragraph("Chưa có giao dịch nào được thêm gần đây.");
+  }
+} else {
+  dv.paragraph("❌ Lỗi tải dữ liệu gần đây từ Supabase.");
+}
+\`\`\`
+
+---
+
+## 🔄 Synced Transactions
+
+\`\`\`dataviewjs
+const SUPABASE_URL = "${process.env.SUPABASE_URL || 'https://fyrgmsfsqzofqduiidrj.supabase.co'}";
+const SUPABASE_ANON_KEY = "${process.env.SUPABASE_ANON_KEY || ''}";
+const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': \`Bearer \${SUPABASE_ANON_KEY}\` };
+
+const monthVal = dv.current().month;
+let month = "";
+if (monthVal) {
+  if (typeof monthVal === 'string') {
+    month = monthVal;
+  } else if (monthVal.toFormat) {
+    month = monthVal.toFormat("yyyy-MM");
+  } else if (monthVal.toISOString) {
+    month = monthVal.toISOString().substring(0, 7);
+  } else {
+    month = String(monthVal);
+  }
+}
+
+if (!month) {
+  dv.paragraph("❌ Thiếu hoặc sai định dạng thuộc tính \`month\` trong YAML frontmatter.");
+} else {
+  const year = parseInt(month.split('-')[0]);
+  const m = parseInt(month.split('-')[1]);
+  const lastDay = new Date(year, m, 0).getDate();
+  const startDate = \`\${month}-01T00:00:00Z\`;
+  const endDate = \`\${month}-\${String(lastDay).padStart(2, '0')}T23:59:59Z\`;
+
+  const [txnRes, peopleRes, accRes] = await Promise.all([
+    fetch(\`\${SUPABASE_URL}/rest/v1/transactions?occurred_at=gte.\${startDate}&occurred_at=lte.\${endDate}&order=occurred_at.desc\`, { headers }),
+    fetch(\`\${SUPABASE_URL}/rest/v1/people?select=id,name\`, { headers }),
+    fetch(\`\${SUPABASE_URL}/rest/v1/accounts?select=id,name\`, { headers })
+  ]);
+
+  if (txnRes.ok && peopleRes.ok && accRes.ok) {
+    const txns = await txnRes.json();
+    const people = await peopleRes.json();
+    const accounts = await accRes.json();
+
+    const peopleMap = Object.fromEntries(people.map(p => [p.id, p.name]));
+    const accMap = Object.fromEntries(accounts.map(a => [a.id, a.name]));
+
+    if (txns.length === 0) {
+      dv.paragraph("Chưa có giao dịch nào được đồng bộ trong tháng này.");
+    } else {
+      let totalIn = 0, totalOut = 0, totalCB = 0;
+      txns.forEach(t => {
+        const amt = Number(t.amount);
+        const cbPct = Number(t.cashback_share_percent || 0);
+        const cbFixed = Number(t.cashback_share_fixed || 0);
+        const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
+        
+        const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
+        if (isPlus) {
+          totalIn += amt;
+        } else {
+          totalOut += amt;
+          totalCB += cbSum;
+        }
+      });
+      
+      dv.paragraph(\`📊 **Tổng Thu:** \${totalIn.toLocaleString()} đ &nbsp;|&nbsp; **Tổng Chi:** \${totalOut.toLocaleString()} đ &nbsp;|&nbsp; **Tổng Hoàn tiền:** \${totalCB.toLocaleString()} đ\`);
+
+      dv.table(
+        ["ID", "Ngày", "Người", "Tài khoản", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
+        txns.map(t => {
+          const d = new Date(t.occurred_at);
+          const shortId = t.id ? t.id.substring(0, 5) : '-';
+          const amt = Number(t.amount);
+          const cbPct = Number(t.cashback_share_percent || 0);
+          const cbFixed = Number(t.cashback_share_fixed || 0);
+          const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
+          const fee = Number(t.metadata?.service_fee || 0);
+          const net = amt - cbSum + fee;
+          const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
+          const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
+          
+          const pLink = peopleMap[t.person_id] ? \`[[\${peopleMap[t.person_id]}]]\` : '-';
+          const accLink = accMap[t.account_id] ? \`[[\${accMap[t.account_id]}]]\` : '-';
+
+          return [
+            \`\\\`\${shortId}\\\`\`,
+            d.toLocaleDateString('vi-VN'),
+            pLink,
+            accLink,
+            typeLabel,
+            \`**\${amt.toLocaleString()} đ**\`,
+            cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
+            cbFixed > 0 ? \`\${cbFixed.toLocaleString()} đ\` : '-',
+            cbSum > 0 ? \`\${cbSum.toLocaleString()} đ\` : '-',
+            \`**\${net.toLocaleString()} đ**\`,
+            t.note || "-"
+          ];
+        })
+      );
+    }
+  } else {
+    dv.paragraph("❌ Lỗi tải dữ liệu giao dịch từ Supabase.");
+  }
+}
+\`\`\`
+`;
     fs.writeFileSync(monthlyFile, template, 'utf8');
   }
 
   const content = fs.readFileSync(monthlyFile, 'utf8');
-
   const lines = content.split('\n');
-  let isUnsyncedSection = false;
-  let isSyncedSection = false;
   
-  const headerLines: string[] = [];
+  let startIndex = -1;
+  let endIndex = lines.length;
+  
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes('## 📥 Unsynced Transactions')) {
+      startIndex = i;
+    } else if (startIndex !== -1 && (lines[i].startsWith('## ') || lines[i].trim() === '---')) {
+      endIndex = i;
+      break;
+    }
+  }
+
+  if (startIndex === -1) {
+    console.error(`Could not find Unsynced Transactions section in ${monthlyFile}`);
+    return;
+  }
+
+  const headerLines = lines.slice(0, startIndex);
+  const unsyncedSection = lines.slice(startIndex, endIndex);
+  const footerLines = lines.slice(endIndex);
+
   const unsyncedLines: string[] = [];
-  const syncedLines: string[] = [];
-  const footerLines: string[] = [];
+  const unsyncedHeader: string[] = [];
 
-  for (const line of lines) {
-    if (line.includes('Unsynced Transactions')) {
-      isUnsyncedSection = true;
-      isSyncedSection = false;
-      headerLines.push(line);
-      continue;
-    }
-    if (line.includes('Synced Transactions')) {
-      isUnsyncedSection = false;
-      isSyncedSection = true;
-      syncedLines.push(line);
-      continue;
-    }
-
-    if (isUnsyncedSection) {
-      const trimmed = line.trim();
-      // Extract transactions from unsynced section
-      // Match lines that look like a list item: `- something` or `> - something`
-      const match = trimmed.match(/^>?\s*-\s+(.*)/);
-      if (match) {
-        unsyncedLines.push(match[1].trim());
-      } else {
-        headerLines.push(line);
-      }
-    } else if (isSyncedSection) {
-      syncedLines.push(line);
+  for (const line of unsyncedSection) {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^>?\s*-\s+(.*)/);
+    if (match) {
+      unsyncedLines.push(match[1].trim());
     } else {
-      headerLines.push(line);
+      unsyncedHeader.push(line);
     }
   }
 
   if (unsyncedLines.length === 0) {
-    return; // Silent if nothing to sync
+    return;
   }
 
-  console.log(`\n--- Processing content in Today.md ---`);
+  console.log(`\n--- Processing content in ${path.basename(monthlyFile)} ---`);
   console.log(`Found ${unsyncedLines.length} unsynced transactions:`, unsyncedLines);
   console.log(`Connecting to AI Gateway (${process.env.AI_BASE_URL}) using model ${modelName}...`);
+  notifyMac('Obsidian Money', 'AI Daemon', `Đang phân tích ${unsyncedLines.length} giao dịch...`);
 
-  const parsedTxns = await parseTransactionsWithAI(unsyncedLines);
+  const parsedTxns = await parseTransactionsWithAI(unsyncedLines, monthStr);
   if (!parsedTxns || !Array.isArray(parsedTxns)) {
     console.error('Failed to parse valid JSON from AI output.');
     return;
@@ -163,7 +390,6 @@ export async function processDailyLog() {
   console.log(`[Supabase sync ready] Attempting DB insertion & advanced services...`);
   const syncWarnings: string[] = [];
   
-  // Fetch all accounts once for fuzzy space-stripped matching
   const { data: allAccounts } = await supabase.from('accounts').select('id, name, current_balance');
 
   for (const item of parsedTxns) {
@@ -189,7 +415,6 @@ export async function processDailyLog() {
         accountId = matches[0].id;
         resolvedName = matches[0].name;
         warningNote = ` [⚠️ Ambiguous '${item.account_name}', auto-picked '${resolvedName}']`;
-        console.warn(`[!] Ambiguous account '${item.account_name}'. Matches: ${matches.map(a => a.name).join(', ')}. Auto-picked '${resolvedName}'.`);
       }
     } else {
       console.log(`Account '${item.account_name}' not found. Creating dummy account...`);
@@ -201,7 +426,6 @@ export async function processDailyLog() {
       if (newAcc) accountId = newAcc.id;
     }
     
-    // Store resolved account name for backlink formatting
     item.resolved_account = resolvedName;
     syncWarnings.push(warningNote);
 
@@ -226,7 +450,7 @@ export async function processDailyLog() {
       }
     }
 
-      const occurredAt = item.occurred_at || new Date().toISOString();
+      const occurredAt = item.occurred_at || new Date(`${year}-${String(month).padStart(2, '0')}-01T12:00:00Z`).toISOString();
       const amt = item.amount || 0;
       const fee = item.service_fee || 0;
       const finalPrice = amt + fee;
@@ -258,19 +482,19 @@ export async function processDailyLog() {
         .select()
         .single();
 
-      if (insErr || !insertedTxn) {
-        console.error(`Error inserting transaction:`, insErr?.message);
+      if (insErr) {
+        console.error(`❌ DB Insert Error:`, insErr.message);
+        syncWarnings[syncWarnings.length - 1] = `❌ DB Error: ${insErr.message}`;
       } else {
-        console.log(`✅ Inserted '${item.note}' (${item.amount} VND) successfully!`);
+        item.inserted_id = insertedTxn.id;
+        console.log(`✅ Inserted '${item.note}' (${amt} VND) successfully!`);
         
-        // Explicitly update account balance via Node.js to ensure 100% reliability
         const { data: acc } = await supabase.from('accounts').select('current_balance').eq('id', accountId).single();
         if (acc) {
           const isPlus = item.type === 'income' || item.type === 'repayment' || item.type === 'refund' || item.type === 'transfer_in';
           const delta = Number(amt);
           const newBalance = isPlus ? Number(acc.current_balance) + delta : Number(acc.current_balance) - delta;
           await supabase.from('accounts').update({ current_balance: newBalance, updated_at: new Date().toISOString() }).eq('id', accountId);
-          console.log(`💲 Account '${resolvedName}' balance updated to ${newBalance.toLocaleString()} VND`);
         }
         
         const payload = {
@@ -291,45 +515,23 @@ export async function processDailyLog() {
       }
   }
 
-  const timestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const hasTable = syncedLines.some(l => l.includes('|---|') || l.includes('| ---'));
-  
-  if (!hasTable && unsyncedLines.length > 0) {
-    syncedLines.push(`\n| ⏰ Giờ | 👤 Người | 💳 Thẻ | 📊 Loại | 💰 Số tiền | 📝 Ghi chú | 🎁 Hoàn / Phí |`);
-    syncedLines.push(`|---|---|---|---|---|---|---|`);
-  }
-
+  // Write back: successfully synced ones are cleared. Failed ones stay.
+  const unsyncedLinesToWrite: string[] = [];
+  let failCount = 0;
   for (let i = 0; i < unsyncedLines.length; i++) {
-    const raw = unsyncedLines[i];
     const warn = syncWarnings[i] || "";
-    const item = parsedTxns[i];
-    
-    if (!item) {
-      syncedLines.push(`| ${timestamp} | - | - | ❓ | - | ${raw} ${warn} | - |`);
-      continue;
+    if (warn.includes('❌')) {
+      unsyncedLinesToWrite.push(`> - ${unsyncedLines[i]} (${warn})`);
+      failCount++;
     }
-
-    let pLink = item.person_name ? `[[${item.person_name}]]` : '-';
-    let aLink = item.resolved_account ? `[[${item.resolved_account}]]` : (item.account_name ? `[[${item.account_name}]]` : '-');
-    let tSign = item.type === 'income' || item.type === 'repayment' ? '🟢' : (item.type === 'expense' ? '🔴' : '🔄');
-    let amtStr = `**${Number(item.amount).toLocaleString()} đ**`;
-    let noteStr = (item.note || raw) + (warn ? ` *(⚠️ ${warn})*` : '');
-    
-    let extraStr = '-';
-    if (item.cashback_share_percent || item.cashback_share_fixed || item.service_fee) {
-      const amt = Number(item.amount || 0);
-      const fee = Number(item.service_fee || 0);
-      const cb = item.cashback_share_percent ? Math.round(amt * item.cashback_share_percent) : Number(item.cashback_share_fixed || 0);
-      const net = amt - cb + fee;
-      extraStr = `Net: ${net.toLocaleString()}đ<br>CB: ${cb.toLocaleString()}đ${fee ? `<br>Fee: ${fee.toLocaleString()}đ` : ''}`;
-    }
-    
-    syncedLines.push(`| ${timestamp} | ${pLink} | ${aLink} | ${tSign} | ${amtStr} | ${noteStr} | ${extraStr} |`);
   }
 
-  const newContent = [...headerLines, ...syncedLines, ...footerLines].join('\n');
+  // If there are failed lines, we keep them below the unsyncedHeader
+  const newContent = [...headerLines, ...unsyncedHeader, ...unsyncedLinesToWrite, ...footerLines].join('\n');
   fs.writeFileSync(monthlyFile, newContent, 'utf8');
-  console.log(`✅ Updated ${monthlyFile} with synced status!`);
+  
+  console.log(`✅ Updated ${monthlyFile}. Cleared synced, kept ${failCount} failed.`);
+  notifyMac('Obsidian Money', 'Hoàn tất!', `Đã đồng bộ thành công ${unsyncedLines.length - failCount} giao dịch.`);
 }
 
 // Only auto-run if executed directly via CLI
