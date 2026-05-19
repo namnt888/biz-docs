@@ -111,75 +111,191 @@ async function parseTransactionsWithAI(lines: string[]) {
   }
 }
 
-export async function processDailyLog(specificFilePath?: string) {
+export async function processDailyLog(targetFile?: string) {
   const vaultPath = process.env.OBSIDIAN_VAULT_PATH || '../vault';
-  const d = new Date();
-  const currentMonthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  
-  // Use specific file if provided, otherwise default to current month
-  const monthlyFile = specificFilePath || path.resolve(vaultPath, '01_Monthly_Logs', `${currentMonthStr}.md`);
+  let monthlyFile = targetFile;
+  let year: number = 0;
+  let month: number = 0;
+  let monthStr: string = "";
+
+  if (monthlyFile) {
+    const basename = path.basename(monthlyFile, '.md');
+    const parts = basename.split('-');
+    if (parts.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
+      year = parseInt(parts[0]);
+      month = parseInt(parts[1]);
+      monthStr = basename;
+    }
+  }
+
+  if (!monthlyFile || !year || !month) {
+    const d = new Date();
+    year = d.getFullYear();
+    month = d.getMonth() + 1;
+    monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    monthlyFile = path.resolve(vaultPath, '01_Monthly_Logs', `${monthStr}.md`);
+  }
   
   if (!fs.existsSync(monthlyFile)) {
-    console.log(`Creating new monthly log for ${path.basename(monthlyFile)}...`);
+    console.log(`Creating new monthly log for ${monthStr}...`);
     const dir = path.dirname(monthlyFile);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     
-    // Extract year and month from filename if possible
-    const match = path.basename(monthlyFile).match(/^(\d{4})-(\d{2})/);
-    let title = `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
-    if (match) title = `Tháng ${match[2]}/${match[1]}`;
-    
-    const template = `# 📅 Ghi chép Chi tiêu ${title}\n\n[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)\n\n---\n\n> [!todo] 📥 Unsynced Transactions\n> Ghi chép các khoản thu chi bằng văn bản tự nhiên ở dưới.\n\n\n> [!success] 🔄 Synced Transactions\n> AI Daemon sẽ tự động bóc tách và chuyển các giao dịch đã đồng bộ xuống đây.\n`;
+    const mStr = String(month).padStart(2, '0');
+    const template = `---
+type: monthly_log
+month: ${monthStr}
+---
+# 📅 Ghi chép Chi tiêu Tháng ${mStr}/${year}
+
+> Ghi chép các khoản thu chi bằng văn bản tự nhiên dưới mục **Unsynced**. Bạn có thể chỉ định tài khoản, kỳ nợ hoặc phí (Vd: \`- ăn trưa 55k Vpbank phí 2k\`).
+> **⚡ Bấm phím tắt Modal Form để nhập qua giao diện trực quan gốc của Obsidian.**
+
+[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)
+
+---
+
+## 📥 Unsynced Transactions
+
+> [!todo] Gõ hoặc paste các giao dịch chưa đồng bộ vào đây:
+
+---
+
+## 🔄 Synced Transactions
+
+\`\`\`dataviewjs
+const SUPABASE_URL = "${SUPABASE_URL}";
+const SUPABASE_ANON_KEY = "${SUPABASE_ANON_KEY}";
+const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': \`Bearer \${SUPABASE_ANON_KEY}\` };
+
+const month = dv.current().month; // e.g. "2025-06"
+if (!month) {
+  dv.paragraph("❌ Thiếu thuộc tính \`month\` trong YAML frontmatter.");
+} else {
+  const year = parseInt(month.split('-')[0]);
+  const m = parseInt(month.split('-')[1]);
+  const lastDay = new Date(year, m, 0).getDate();
+  const startDate = \`\${month}-01T00:00:00Z\`;
+  const endDate = \`\${month}-\${String(lastDay).padStart(2, '0')}T23:59:59Z\`;
+
+  const [txnRes, peopleRes, accRes] = await Promise.all([
+    fetch(\`\${SUPABASE_URL}/rest/v1/transactions?occurred_at=gte.\${startDate}&occurred_at=lte.\${endDate}&order=occurred_at.desc\`, { headers }),
+    fetch(\`\${SUPABASE_URL}/rest/v1/people?select=id,name\`, { headers }),
+    fetch(\`\${SUPABASE_URL}/rest/v1/accounts?select=id,name\`, { headers })
+  ]);
+
+  if (txnRes.ok && peopleRes.ok && accRes.ok) {
+    const txns = await txnRes.json();
+    const people = await peopleRes.json();
+    const accounts = await accRes.json();
+
+    const peopleMap = Object.fromEntries(people.map(p => [p.id, p.name]));
+    const accMap = Object.fromEntries(accounts.map(a => [a.id, a.name]));
+
+    if (txns.length === 0) {
+      dv.paragraph("Chưa có giao dịch nào được đồng bộ trong tháng này.");
+    } else {
+      let totalIn = 0, totalOut = 0, totalCB = 0;
+      txns.forEach(t => {
+        const amt = Number(t.amount);
+        const cbPct = Number(t.cashback_share_percent || 0);
+        const cbFixed = Number(t.cashback_share_fixed || 0);
+        const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
+        
+        const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
+        if (isPlus) {
+          totalIn += amt;
+        } else {
+          totalOut += amt;
+          totalCB += cbSum;
+        }
+      });
+      
+      dv.paragraph(\`📊 **Tổng Thu:** \${totalIn.toLocaleString()} đ &nbsp;|&nbsp; **Tổng Chi:** \${totalOut.toLocaleString()} đ &nbsp;|&nbsp; **Tổng Hoàn tiền:** \${totalCB.toLocaleString()} đ\`);
+
+      dv.table(
+        ["ID", "Ngày", "Người", "Tài khoản", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
+        txns.map(t => {
+          const d = new Date(t.occurred_at);
+          const shortId = t.id ? t.id.substring(0, 5) : '-';
+          const amt = Number(t.amount);
+          const cbPct = Number(t.cashback_share_percent || 0);
+          const cbFixed = Number(t.cashback_share_fixed || 0);
+          const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
+          const fee = Number(t.metadata?.service_fee || 0);
+          const net = amt - cbSum + fee;
+          const sign = ['income','repayment','refund','transfer_in'].includes(t.type) ? '🟢 +' : '🔴 -';
+          
+          const pLink = peopleMap[t.person_id] ? \`[[\${peopleMap[t.person_id]}]]\` : '-';
+          const accLink = accMap[t.account_id] ? \`[[\${accMap[t.account_id]}]]\` : '-';
+
+          return [
+            \`\\\`\${shortId}\\\`\`,
+            d.toLocaleDateString('vi-VN'),
+            pLink,
+            accLink,
+            \`\${sign}\${t.type}\`,
+            \`**\${amt.toLocaleString()} đ**\`,
+            cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
+            cbFixed > 0 ? \`\${cbFixed.toLocaleString()} đ\` : '-',
+            cbSum > 0 ? \`\${cbSum.toLocaleString()} đ\` : '-',
+            \`**\${net.toLocaleString()} đ**\`,
+            t.note || "-"
+          ];
+        })
+      );
+    }
+  } else {
+    dv.paragraph("❌ Lỗi tải dữ liệu giao dịch từ Supabase.");
+  }
+}
+\`\`\`
+`;
     fs.writeFileSync(monthlyFile, template, 'utf8');
   }
 
   const content = fs.readFileSync(monthlyFile, 'utf8');
-
   const lines = content.split('\n');
-  let isUnsyncedSection = false;
-  let isSyncedSection = false;
   
-  const headerLines: string[] = [];
+  let startIndex = -1;
+  let endIndex = lines.length;
+  
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes('## 📥 Unsynced Transactions')) {
+      startIndex = i;
+    } else if (startIndex !== -1 && (lines[i].startsWith('## ') || lines[i].trim() === '---')) {
+      endIndex = i;
+      break;
+    }
+  }
+
+  if (startIndex === -1) {
+    console.error(`Could not find Unsynced Transactions section in ${monthlyFile}`);
+    return;
+  }
+
+  const headerLines = lines.slice(0, startIndex);
+  const unsyncedSection = lines.slice(startIndex, endIndex);
+  const footerLines = lines.slice(endIndex);
+
   const unsyncedLines: string[] = [];
-  const syncedLines: string[] = [];
-  const footerLines: string[] = [];
+  const unsyncedHeader: string[] = [];
 
-  for (const line of lines) {
-    if (line.includes('Unsynced Transactions')) {
-      isUnsyncedSection = true;
-      isSyncedSection = false;
-      headerLines.push(line);
-      continue;
-    }
-    if (line.includes('Synced Transactions')) {
-      isUnsyncedSection = false;
-      isSyncedSection = true;
-      syncedLines.push(line);
-      continue;
-    }
-
-    if (isUnsyncedSection) {
-      const trimmed = line.trim();
-      // Extract transactions from unsynced section
-      // Match lines that look like a list item: `- something` or `> - something` or `> * something`
-      const match = trimmed.match(/^>?\s*[-*+]\s+(.*)/);
-      if (match) {
-        unsyncedLines.push(match[1].trim());
-      } else {
-        headerLines.push(line);
-      }
-    } else if (isSyncedSection) {
-      syncedLines.push(line);
+  for (const line of unsyncedSection) {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^>?\s*-\s+(.*)/);
+    if (match) {
+      unsyncedLines.push(match[1].trim());
     } else {
-      headerLines.push(line);
+      unsyncedHeader.push(line);
     }
   }
 
   if (unsyncedLines.length === 0) {
-    return; // Silent if nothing to sync
+    return;
   }
 
-  console.log(`\n--- Processing content in Today.md ---`);
+  console.log(`\n--- Processing content in ${path.basename(monthlyFile)} ---`);
   console.log(`Found ${unsyncedLines.length} unsynced transactions:`, unsyncedLines);
   console.log(`Connecting to AI Gateway (${process.env.AI_BASE_URL}) using model ${modelName}...`);
   notifyMac('Obsidian Money', 'AI Daemon', `Đang phân tích ${unsyncedLines.length} giao dịch...`);
@@ -196,7 +312,6 @@ export async function processDailyLog(specificFilePath?: string) {
   console.log(`[Supabase sync ready] Attempting DB insertion & advanced services...`);
   const syncWarnings: string[] = [];
   
-  // Fetch all accounts once for fuzzy space-stripped matching
   const { data: allAccounts } = await supabase.from('accounts').select('id, name, current_balance');
 
   for (const item of parsedTxns) {
@@ -222,7 +337,6 @@ export async function processDailyLog(specificFilePath?: string) {
         accountId = matches[0].id;
         resolvedName = matches[0].name;
         warningNote = ` [⚠️ Ambiguous '${item.account_name}', auto-picked '${resolvedName}']`;
-        console.warn(`[!] Ambiguous account '${item.account_name}'. Matches: ${matches.map(a => a.name).join(', ')}. Auto-picked '${resolvedName}'.`);
       }
     } else {
       console.log(`Account '${item.account_name}' not found. Creating dummy account...`);
@@ -234,7 +348,6 @@ export async function processDailyLog(specificFilePath?: string) {
       if (newAcc) accountId = newAcc.id;
     }
     
-    // Store resolved account name for backlink formatting
     item.resolved_account = resolvedName;
     syncWarnings.push(warningNote);
 
@@ -259,7 +372,7 @@ export async function processDailyLog(specificFilePath?: string) {
       }
     }
 
-      const occurredAt = item.occurred_at || new Date().toISOString();
+      const occurredAt = item.occurred_at || new Date(`${year}-${String(month).padStart(2, '0')}-01T12:00:00Z`).toISOString();
       const amt = item.amount || 0;
       const fee = item.service_fee || 0;
       const finalPrice = amt + fee;
@@ -293,19 +406,17 @@ export async function processDailyLog(specificFilePath?: string) {
 
       if (insErr) {
         console.error(`❌ DB Insert Error:`, insErr.message);
-        syncWarnings.push(` [❌ DB Error: ${insErr.message}]`);
+        syncWarnings[syncWarnings.length - 1] = `❌ DB Error: ${insErr.message}`;
       } else {
         item.inserted_id = insertedTxn.id;
         console.log(`✅ Inserted '${item.note}' (${amt} VND) successfully!`);
         
-        // Explicitly update account balance via Node.js to ensure 100% reliability
         const { data: acc } = await supabase.from('accounts').select('current_balance').eq('id', accountId).single();
         if (acc) {
           const isPlus = item.type === 'income' || item.type === 'repayment' || item.type === 'refund' || item.type === 'transfer_in';
           const delta = Number(amt);
           const newBalance = isPlus ? Number(acc.current_balance) + delta : Number(acc.current_balance) - delta;
           await supabase.from('accounts').update({ current_balance: newBalance, updated_at: new Date().toISOString() }).eq('id', accountId);
-          console.log(`💲 Account '${resolvedName}' balance updated to ${newBalance.toLocaleString()} VND`);
         }
         
         const payload = {
@@ -326,51 +437,23 @@ export async function processDailyLog(specificFilePath?: string) {
       }
   }
 
-  const timestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const hasTable = syncedLines.some(l => l.includes('|---|') || l.includes('| ---'));
-  
-  if (!hasTable && unsyncedLines.length > 0) {
-    syncedLines.push(`\n| ID | ⏰ Giờ | 👤 Người | 💳 Thẻ | 📊 Loại | 💰 Số tiền | 📝 Ghi chú | 🎁 Hoàn / Phí |`);
-    syncedLines.push(`|---|---|---|---|---|---|---|---|`);
-  }
-
+  // Write back: successfully synced ones are cleared. Failed ones stay.
+  const unsyncedLinesToWrite: string[] = [];
+  let failCount = 0;
   for (let i = 0; i < unsyncedLines.length; i++) {
-    const raw = unsyncedLines[i];
     const warn = syncWarnings[i] || "";
-    const item = parsedTxns[i];
-    
-    if (!item) {
-      syncedLines.push(`| - | ${timestamp} | - | - | ❓ | - | ${raw} ${warn} | - |`);
-      continue;
+    if (warn.includes('❌')) {
+      unsyncedLinesToWrite.push(`> - ${unsyncedLines[i]} (${warn})`);
+      failCount++;
     }
-
-    // Attempt to extract or generate short ID. Supabase uses UUIDs, but if we don't have it here yet because we inserted it in a different loop...
-    // Wait, we don't have the inserted UUID in `parsedTxns` because `parsedTxns` is just the AI parsed JSON!
-    // But wait! We DO have `item.inserted_id` if we modify the insertion loop to add it!
-
-    let pLink = item.person_name ? `[[${item.person_name}]]` : '-';
-    let aLink = item.resolved_account ? `[[${item.resolved_account}]]` : (item.account_name ? `[[${item.account_name}]]` : '-');
-    let tSign = item.type === 'income' || item.type === 'repayment' ? '🟢' : (item.type === 'expense' ? '🔴' : '🔄');
-    let amtStr = `**${Number(item.amount).toLocaleString()} đ**`;
-    let noteStr = (item.note || raw) + (warn ? ` *(⚠️ ${warn})*` : '');
-    
-    let extraStr = '-';
-    if (item.cashback_share_percent || item.cashback_share_fixed || item.service_fee) {
-      const amt = Number(item.amount || 0);
-      const fee = Number(item.service_fee || 0);
-      const cb = item.cashback_share_percent ? Math.round(amt * item.cashback_share_percent) : Number(item.cashback_share_fixed || 0);
-      const net = amt - cb + fee;
-      extraStr = `Net: ${net.toLocaleString()}đ<br>CB: ${cb.toLocaleString()}đ${fee ? `<br>Fee: ${fee.toLocaleString()}đ` : ''}`;
-    }
-    
-    const shortId = item.inserted_id ? item.inserted_id.substring(0, 5) : '-';
-    syncedLines.push(`| \`${shortId}\` | ${timestamp} | ${pLink} | ${aLink} | ${tSign} | ${amtStr} | ${noteStr} | ${extraStr} |`);
   }
 
-  const newContent = [...headerLines, ...syncedLines, ...footerLines].join('\n');
+  // If there are failed lines, we keep them below the unsyncedHeader
+  const newContent = [...headerLines, ...unsyncedHeader, ...unsyncedLinesToWrite, ...footerLines].join('\n');
   fs.writeFileSync(monthlyFile, newContent, 'utf8');
-  console.log(`✅ Updated ${monthlyFile} with synced status!`);
-  notifyMac('Obsidian Money', 'Hoàn tất!', `Đã đồng bộ thành công ${unsyncedLines.length} giao dịch.`);
+  
+  console.log(`✅ Updated ${monthlyFile}. Cleared synced, kept ${failCount} failed.`);
+  notifyMac('Obsidian Money', 'Hoàn tất!', `Đã đồng bộ thành công ${unsyncedLines.length - failCount} giao dịch.`);
 }
 
 // Only auto-run if executed directly via CLI
