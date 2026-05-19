@@ -15,6 +15,66 @@ month: "{{title}}"
 
 > [!todo] Gõ hoặc paste các giao dịch chưa đồng bộ vào đây:
 
+## ⚡ Recent Added (Vừa thêm gần đây)
+
+```dataviewjs
+const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
+const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+
+const [txnRes, peopleRes, accRes] = await Promise.all([
+  fetch(`${SUPABASE_URL}/rest/v1/transactions?order=created_at.desc&limit=5`, { headers }),
+  fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name`, { headers }),
+  fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name`, { headers })
+]);
+
+if (txnRes.ok && peopleRes.ok && accRes.ok) {
+  const txns = await txnRes.json();
+  const people = await peopleRes.json();
+  const accounts = await accRes.json();
+  const peopleMap = Object.fromEntries(people.map(p => [p.id, p.name]));
+  const accMap = Object.fromEntries(accounts.map(a => [a.id, a.name]));
+
+  if (txns.length > 0) {
+    dv.table(
+      ["ID", "Ngày GD", "Thời gian Thêm", "Người", "Tài khoản", "Loại", "Số tiền", "% CB", "Final Price", "Ghi chú"],
+      txns.map(t => {
+        const d = new Date(t.occurred_at);
+        const c = new Date(t.created_at);
+        const shortId = t.id ? t.id.substring(0, 5) : '-';
+        const amt = Number(t.amount);
+        const cbPct = Number(t.cashback_share_percent || 0);
+        const cbFixed = Number(t.cashback_share_fixed || 0);
+        const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
+        const fee = Number(t.metadata?.service_fee || 0);
+        const net = amt - cbSum + fee;
+        const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
+        const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
+        const pLink = peopleMap[t.person_id] ? `[[${peopleMap[t.person_id]}]]` : '-';
+        const accLink = accMap[t.account_id] ? `[[${accMap[t.account_id]}]]` : '-';
+
+        return [
+          `\`${shortId}\``,
+          d.toLocaleDateString('vi-VN'),
+          c.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          pLink,
+          accLink,
+          typeLabel,
+          `**${amt.toLocaleString()} đ**`,
+          cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
+          `**${net.toLocaleString()} đ**`,
+          t.note || "-"
+        ];
+      })
+    );
+  } else {
+    dv.paragraph("Chưa có giao dịch nào được thêm gần đây.");
+  }
+} else {
+  dv.paragraph("❌ Lỗi tải dữ liệu gần đây từ Supabase.");
+}
+```
+
 ---
 
 ## 🔄 Synced Transactions
