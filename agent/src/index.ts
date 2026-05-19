@@ -79,13 +79,17 @@ Examples:
 Return ONLY valid JSON array [ { ... } ]. Do not include markdown formatting or any explanations.
 `;
 
-async function parseTransactionsWithAI(lines: string[]) {
+async function parseTransactionsWithAI(lines: string[], fileMonthContext?: string) {
+  let systemPromptWithContext = SYSTEM_PROMPT;
+  if (fileMonthContext) {
+    systemPromptWithContext += `\n\nCRITICAL CONTEXT: The transactions you are parsing belong to the monthly log for the period "${fileMonthContext}". Any relative or DD-MM dates (e.g., '15-06', '08/06') MUST be parsed with the year and month from "${fileMonthContext}" (i.e. year: ${fileMonthContext.substring(0, 4)}, month: ${fileMonthContext.substring(5, 7)}). Do NOT default to the current runtime year unless the text explicitly states a different year.`;
+  }
   const promptText = `Parse the following raw lines into a JSON array:\n` + lines.join('\n');
   try {
     const response = await openai.chat.completions.create({
       model: modelName,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPromptWithContext },
         { role: 'user', content: promptText },
       ],
       temperature: 0.1,
@@ -151,7 +155,7 @@ month: "${monthStr}"
 > Ghi chép các khoản thu chi bằng văn bản tự nhiên dưới mục **Unsynced**. Bạn có thể chỉ định tài khoản, kỳ nợ hoặc phí (Vd: \`- ăn trưa 55k Vpbank phí 2k\`).
 > **⚡ Bấm phím tắt Modal Form để nhập qua giao diện trực quan gốc của Obsidian.**
 
-[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)
+[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [👤 Báo cáo của tôi](../00_Dashboard/My_Report.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)
 
 ---
 
@@ -374,7 +378,7 @@ if (!month) {
   console.log(`Connecting to AI Gateway (${process.env.AI_BASE_URL}) using model ${modelName}...`);
   notifyMac('Obsidian Money', 'AI Daemon', `Đang phân tích ${unsyncedLines.length} giao dịch...`);
 
-  const parsedTxns = await parseTransactionsWithAI(unsyncedLines);
+  const parsedTxns = await parseTransactionsWithAI(unsyncedLines, monthStr);
   if (!parsedTxns || !Array.isArray(parsedTxns)) {
     console.error('Failed to parse valid JSON from AI output.');
     return;

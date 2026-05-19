@@ -2,7 +2,7 @@
 
 > [!NOTE] Dữ liệu thu chi được tổng hợp theo thời gian thực từ Supabase.
 
-[👈 Trở về Dashboard](Dashboard.md)
+[👈 Trở về Dashboard](Dashboard.md) | [👤 Báo cáo của tôi](My_Report.md) | [🤝 Trung tâm Công nợ](Debt_Center.md) | [🎁 Quản lý Hoàn tiền](Cashback_Center.md)
 
 ---
 

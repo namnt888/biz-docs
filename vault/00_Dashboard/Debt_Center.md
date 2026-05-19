@@ -2,7 +2,7 @@
 
 > [!NOTE] Bảng vị thế ròng (Net Position) cho biết bạn đang dương tiền hay âm tiền với từng đối tác/bạn bè.
 
-[👈 Trở về Dashboard](Dashboard.md)
+[👈 Trở về Dashboard](Dashboard.md) | [👤 Báo cáo của tôi](My_Report.md) | [💸 Phân tích Thu Chi](Cashflow_Analytics.md) | [🎁 Quản lý Hoàn tiền](Cashback_Center.md)
 
 ---
 
