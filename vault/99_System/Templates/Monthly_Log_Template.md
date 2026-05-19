@@ -1,8 +1,8 @@
 ---
 type: monthly_log
-month: "2025-06"
+month: "{{title}}"
 ---
-# 📅 Ghi chép Chi tiêu Tháng 06/2025
+# 📅 Ghi chép Chi tiêu Tháng {{title}}
 
 > Ghi chép các khoản thu chi bằng văn bản tự nhiên dưới mục **Unsynced**. Bạn có thể chỉ định tài khoản, kỳ nợ hoặc phí (Vd: `- ăn trưa 55k Vpbank phí 2k`).
 > **⚡ Bấm phím tắt Modal Form để nhập qua giao diện trực quan gốc của Obsidian.**

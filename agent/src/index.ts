@@ -144,7 +144,7 @@ export async function processDailyLog(targetFile?: string) {
     const mStr = String(month).padStart(2, '0');
     const template = `---
 type: monthly_log
-month: ${monthStr}
+month: "${monthStr}"
 ---
 # 📅 Ghi chép Chi tiêu Tháng ${mStr}/${year}
 
@@ -168,9 +168,22 @@ const SUPABASE_URL = "${SUPABASE_URL}";
 const SUPABASE_ANON_KEY = "${SUPABASE_ANON_KEY}";
 const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': \`Bearer \${SUPABASE_ANON_KEY}\` };
 
-const month = dv.current().month; // e.g. "2025-06"
+const monthVal = dv.current().month;
+let month = "";
+if (monthVal) {
+  if (typeof monthVal === 'string') {
+    month = monthVal;
+  } else if (monthVal.toFormat) {
+    month = monthVal.toFormat("yyyy-MM");
+  } else if (monthVal.toISOString) {
+    month = monthVal.toISOString().substring(0, 7);
+  } else {
+    month = String(monthVal);
+  }
+}
+
 if (!month) {
-  dv.paragraph("❌ Thiếu thuộc tính \`month\` trong YAML frontmatter.");
+  dv.paragraph("❌ Thiếu hoặc sai định dạng thuộc tính \`month\` trong YAML frontmatter.");
 } else {
   const year = parseInt(month.split('-')[0]);
   const m = parseInt(month.split('-')[1]);
@@ -224,7 +237,8 @@ if (!month) {
           const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
           const fee = Number(t.metadata?.service_fee || 0);
           const net = amt - cbSum + fee;
-          const sign = ['income','repayment','refund','transfer_in'].includes(t.type) ? '🟢 +' : '🔴 -';
+          const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
+          const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
           
           const pLink = peopleMap[t.person_id] ? \`[[\${peopleMap[t.person_id]}]]\` : '-';
           const accLink = accMap[t.account_id] ? \`[[\${accMap[t.account_id]}]]\` : '-';
@@ -234,7 +248,7 @@ if (!month) {
             d.toLocaleDateString('vi-VN'),
             pLink,
             accLink,
-            \`\${sign}\${t.type}\`,
+            typeLabel,
             \`**\${amt.toLocaleString()} đ**\`,
             cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
             cbFixed > 0 ? \`\${cbFixed.toLocaleString()} đ\` : '-',
