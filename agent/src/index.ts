@@ -111,18 +111,25 @@ async function parseTransactionsWithAI(lines: string[]) {
   }
 }
 
-export async function processDailyLog() {
+export async function processDailyLog(specificFilePath?: string) {
   const vaultPath = process.env.OBSIDIAN_VAULT_PATH || '../vault';
   const d = new Date();
   const currentMonthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  const monthlyFile = path.resolve(vaultPath, '01_Monthly_Logs', `${currentMonthStr}.md`);
+  
+  // Use specific file if provided, otherwise default to current month
+  const monthlyFile = specificFilePath || path.resolve(vaultPath, '01_Monthly_Logs', `${currentMonthStr}.md`);
   
   if (!fs.existsSync(monthlyFile)) {
-    console.log(`Creating new monthly log for ${currentMonthStr}...`);
+    console.log(`Creating new monthly log for ${path.basename(monthlyFile)}...`);
     const dir = path.dirname(monthlyFile);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     
-    const template = `# 📅 Ghi chép Chi tiêu Tháng ${d.getMonth() + 1}/${d.getFullYear()}\n\n[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)\n\n---\n\n> [!todo] 📥 Unsynced Transactions\n> Ghi chép các khoản thu chi bằng văn bản tự nhiên ở dưới.\n\n\n> [!success] 🔄 Synced Transactions\n> AI Daemon sẽ tự động bóc tách và chuyển các giao dịch đã đồng bộ xuống đây.\n`;
+    // Extract year and month from filename if possible
+    const match = path.basename(monthlyFile).match(/^(\d{4})-(\d{2})/);
+    let title = `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
+    if (match) title = `Tháng ${match[2]}/${match[1]}`;
+    
+    const template = `# 📅 Ghi chép Chi tiêu ${title}\n\n[👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)\n\n---\n\n> [!todo] 📥 Unsynced Transactions\n> Ghi chép các khoản thu chi bằng văn bản tự nhiên ở dưới.\n\n\n> [!success] 🔄 Synced Transactions\n> AI Daemon sẽ tự động bóc tách và chuyển các giao dịch đã đồng bộ xuống đây.\n`;
     fs.writeFileSync(monthlyFile, template, 'utf8');
   }
 
@@ -154,8 +161,8 @@ export async function processDailyLog() {
     if (isUnsyncedSection) {
       const trimmed = line.trim();
       // Extract transactions from unsynced section
-      // Match lines that look like a list item: `- something` or `> - something`
-      const match = trimmed.match(/^>?\s*-\s+(.*)/);
+      // Match lines that look like a list item: `- something` or `> - something` or `> * something`
+      const match = trimmed.match(/^>?\s*[-*+]\s+(.*)/);
       if (match) {
         unsyncedLines.push(match[1].trim());
       } else {

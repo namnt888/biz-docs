@@ -38,7 +38,7 @@ watcher.on('all', async (event, filePath) => {
     isProcessing = true;
     try {
       console.log(`\n📄 Detected change in ${path.basename(filePath)}. Triggering sync...`);
-      await processDailyLog();
+      await processDailyLog(filePath);
     } catch (err) {
       console.error('Daemon execution error:', err);
     } finally {
