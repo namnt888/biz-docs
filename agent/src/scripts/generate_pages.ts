@@ -107,11 +107,11 @@ const res = await fetch(\`\${SUPABASE_URL}/rest/v1/transactions?account_id=eq.\$
 
 if (res.ok) {
   const txns = await res.json();
-  dv.table(["ID", "Kỳ", "Ngày", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
+  dv.table(["ID", "Loại", "Kỳ", "Ngày", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
-    const sign = isPlus ? "🟢 +" : "🔴 -";
+    const typeLabel = isPlus ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
     const d = new Date(t.occurred_at);
-    const mStr = \`\${d.getFullYear()}-\${String(d.getMonth() + 1).padStart(2, '0')}\`;
+    const mStr = \`\${d.getFullYear()}-\\ \${String(d.getMonth() + 1).padStart(2, '0')}\`.replace('- ', '-');
     const shortId = t.id ? t.id.substring(0, 5) : '-';
     const amt = Number(t.amount);
     const cbPct = Number(t.cashback_share_percent || 0);
@@ -121,9 +121,9 @@ if (res.ok) {
     const net = amt - cbSum + fee;
     return [
       \`\\\`\${shortId}\\\`\`,
-      \`[[\${mStr}]]\`,
+      typeLabel,
+      \`[[01_Monthly_Logs/\${mStr}|\${mStr}]]\`,
       d.toLocaleDateString('vi-VN'),
-      \`\${sign}\${t.type}\`,
       \`**\${amt.toLocaleString()} đ**\`,
       cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
       cbFixed > 0 ? \`\${cbFixed.toLocaleString()} đ\` : '-',
@@ -178,14 +178,14 @@ if (res.ok) {
     const totalRemain = debts.reduce((s, d) => s + Number(d.remaining_amount), 0);
     dv.paragraph(\`📊 **Tổng nợ:** \${totalOrig.toLocaleString()} đ &nbsp;|&nbsp; **Đã trả:** \${totalRepaid.toLocaleString()} đ &nbsp;|&nbsp; **Còn lại:** \${totalRemain.toLocaleString()} đ\`);
 
-    dv.table(["Kỳ (Cycle)", "Loại", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Trạng thái"], debts.map(d => {
-      const roleStr = d.debt_role === 'lent' ? "🟢 Cho vay" : "🔴 Đi mượn";
+    dv.table(["Loại", "Kỳ (Cycle)", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Trạng thái"], debts.map(d => {
+      const roleStr = d.debt_role === 'lent' ? '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>' : '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>';
       let statusStr = "⚪ Settled";
       if (d.status === 'pending') statusStr = "🔴 Pending";
       if (d.status === 'partial') statusStr = "🟠 Partial";
       const dt = new Date(d.occurred_at);
-      const mStr = \`\${dt.getFullYear()}-\${String(dt.getMonth() + 1).padStart(2, '0')}\`;
-      return [mStr, roleStr, d.notes || "-",
+      const mStr = \`\${dt.getFullYear()}-\\ \${String(dt.getMonth() + 1).padStart(2, '0')}\`.replace('- ', '-');
+      return [roleStr, \`[[01_Monthly_Logs/\${mStr}|\${mStr}]]\`, d.notes || "-",
         \`\${Number(d.original_amount).toLocaleString()} đ\`,
         \`\${Number(d.repaid_amount).toLocaleString()} đ\`,
         \`**\${Number(d.remaining_amount).toLocaleString()} đ**\`,
@@ -255,10 +255,10 @@ if (res.ok) {
       }, 0);
       const totalNet = totalAmt - totalCB;
 
-      dv.header(3, \`📅 [[\${month}]] — \${monthTxns.length} txn | 💰 \${totalAmt.toLocaleString()} đ | 🎁 CB: \${totalCB.toLocaleString()} đ | Net: \${totalNet.toLocaleString()} đ\`);
+      dv.header(3, \`📅 [[01_Monthly_Logs/\${month}|\${month}]] — \${monthTxns.length} txn | 💰 \${totalAmt.toLocaleString()} đ | 🎁 CB: \${totalCB.toLocaleString()} đ | Net: \${totalNet.toLocaleString()} đ\`);
 
       dv.table(
-        ["ID", "Ngày", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
+        ["ID", "Loại", "Ngày", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
         monthTxns.map(t => {
           const d = new Date(t.occurred_at);
           const shortId = t.id ? t.id.substring(0, 5) : '-';
@@ -268,11 +268,12 @@ if (res.ok) {
           const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
           const fee = Number(t.metadata?.service_fee || 0);
           const net = amt - cbSum + fee;
-          const sign = ['income','repayment','refund','transfer_in'].includes(t.type) ? '🟢 +' : '🔴 -';
+          const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
+          const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
           return [
             \`\\\`\${shortId}\\\`\`,
+            typeLabel,
             d.toLocaleDateString('vi-VN'),
-            \`\${sign}\${t.type}\`,
             \`**\${amt.toLocaleString()} đ**\`,
             cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
             cbFixed > 0 ? \`\${cbFixed.toLocaleString()} đ\` : '-',

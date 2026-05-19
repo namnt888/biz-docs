@@ -83,11 +83,11 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${ac
 
 if (res.ok) {
   const txns = await res.json();
-  dv.table(["ID", "Kỳ", "Ngày", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
+  dv.table(["ID", "Loại", "Kỳ", "Ngày", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
-    const sign = isPlus ? "🟢 +" : "🔴 -";
+    const typeLabel = isPlus ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
     const d = new Date(t.occurred_at);
-    const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const mStr = `${d.getFullYear()}-\ ${String(d.getMonth() + 1).padStart(2, '0')}`.replace('- ', '-');
     const shortId = t.id ? t.id.substring(0, 5) : '-';
     const amt = Number(t.amount);
     const cbPct = Number(t.cashback_share_percent || 0);
@@ -97,9 +97,9 @@ if (res.ok) {
     const net = amt - cbSum + fee;
     return [
       `\`${shortId}\``,
-      `[[${mStr}]]`,
+      typeLabel,
+      `[[01_Monthly_Logs/${mStr}|${mStr}]]`,
       d.toLocaleDateString('vi-VN'),
-      `${sign}${t.type}`,
       `**${amt.toLocaleString()} đ**`,
       cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
       cbFixed > 0 ? `${cbFixed.toLocaleString()} đ` : '-',

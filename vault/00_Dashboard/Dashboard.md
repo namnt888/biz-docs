@@ -106,9 +106,9 @@ try {
     if (debts.length === 0) {
       dv.paragraph("🎉 Tuyệt vời! Bạn không có khoản nợ nào cần xử lý.");
     } else {
-      dv.table(["Người liên quan", "Phân loại", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Tiến độ"], debts.map(d => {
+      dv.table(["Loại", "Người liên quan", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Tiến độ"], debts.map(d => {
         const personName = peopleMap[d.person_id] || "Unknown";
-        const role = d.debt_role === "lent" ? "🟢 Cho vay (Lent)" : "🔴 Đi mượn (Borrowed)";
+        const role = d.debt_role === "lent" ? '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>' : '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>';
         const orig = Number(d.original_amount);
         const repaid = Number(d.repaid_amount);
         const remain = Number(d.remaining_amount);
@@ -119,7 +119,7 @@ try {
         const bar = "▓".repeat(filled) + "░".repeat(barLength - filled);
         
         return [
-          `**[[${personName}]]**`, role, d.notes || "-",
+          role, `**[[${personName}]]**`, d.notes || "-",
           `${orig.toLocaleString()} VND`, `${repaid.toLocaleString()} VND`,
           `**${remain.toLocaleString()} VND**`, `${bar} (${percent}%)`
         ];

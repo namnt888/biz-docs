@@ -88,10 +88,10 @@ try {
     const people = await peopleRes.json();
     const peopleMap = Object.fromEntries(people.map(p => [p.id, p.name]));
     
-    dv.table(["Thời gian phát sinh", "Đối tác", "Phân loại", "Ghi chú", "Tổng số tiền", "Đã trả", "Còn nợ"], debts.map(d => [
+    dv.table(["Loại", "Thời gian phát sinh", "Đối tác", "Ghi chú", "Tổng số tiền", "Đã trả", "Còn nợ"], debts.map(d => [
+      d.debt_role === 'lent' ? '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>' : '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>',
       new Date(d.occurred_at).toLocaleDateString('vi-VN'),
       `**[[${peopleMap[d.person_id] || "Unknown"}]]**`,
-      d.debt_role === 'lent' ? "🟢 Cho vay" : "🔴 Đi mượn",
       d.notes || "-",
       `${Number(d.original_amount).toLocaleString()} VND`,
       `${Number(d.repaid_amount).toLocaleString()} VND`,

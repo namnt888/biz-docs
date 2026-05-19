@@ -9,6 +9,7 @@ id: 67f1f69a-826c-4348-99b7-fafab0eba37a
 ## 📂 Giao dịch theo Năm
 
 - [[Lâm/2026|📅 2026]]
+- [[Lâm/2025|📅 2025]]
 - [[Lâm/2024|📅 2024]]
 
 ---
@@ -35,14 +36,14 @@ if (res.ok) {
     const totalRemain = debts.reduce((s, d) => s + Number(d.remaining_amount), 0);
     dv.paragraph(`📊 **Tổng nợ:** ${totalOrig.toLocaleString()} đ &nbsp;|&nbsp; **Đã trả:** ${totalRepaid.toLocaleString()} đ &nbsp;|&nbsp; **Còn lại:** ${totalRemain.toLocaleString()} đ`);
 
-    dv.table(["Kỳ (Cycle)", "Loại", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Trạng thái"], debts.map(d => {
-      const roleStr = d.debt_role === 'lent' ? "🟢 Cho vay" : "🔴 Đi mượn";
+    dv.table(["Loại", "Kỳ (Cycle)", "Ghi chú", "Tổng nợ", "Đã trả", "Còn lại", "Trạng thái"], debts.map(d => {
+      const roleStr = d.debt_role === 'lent' ? '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>' : '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>';
       let statusStr = "⚪ Settled";
       if (d.status === 'pending') statusStr = "🔴 Pending";
       if (d.status === 'partial') statusStr = "🟠 Partial";
       const dt = new Date(d.occurred_at);
-      const mStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-      return [mStr, roleStr, d.notes || "-",
+      const mStr = `${dt.getFullYear()}-\ ${String(dt.getMonth() + 1).padStart(2, '0')}`.replace('- ', '-');
+      return [roleStr, `[[01_Monthly_Logs/${mStr}|${mStr}]]`, d.notes || "-",
         `${Number(d.original_amount).toLocaleString()} đ`,
         `${Number(d.repaid_amount).toLocaleString()} đ`,
         `**${Number(d.remaining_amount).toLocaleString()} đ**`,
