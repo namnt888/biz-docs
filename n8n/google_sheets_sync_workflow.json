@@ -107,6 +107,62 @@
     },
     {
       "parameters": {
+        "method": "GET",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId }}?fields=sheets.properties",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "id": "check-sheet-exists-http",
+      "name": "Check Sheet Existence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        880,
+        180
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qi7b3ugwTvV969Ar",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sheets = $json.sheets || [];\nconst targetCycle = $('Dynamic Router (Phân luồng User & Cycle)').item.json.cycle;\nconst templateSheet = sheets.find(s => s.properties.title === 'Template');\nconst targetSheet = sheets.find(s => s.properties.title === targetCycle);\n\nif (!templateSheet) {\n  throw new Error(\"Template sheet not found in the spreadsheet!\");\n}\n\nreturn {\n  json: {\n    sheetExists: !!targetSheet,\n    templateSheetId: templateSheet.properties.sheetId,\n    targetCycle: targetCycle,\n    spreadsheetId: $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId\n  }\n};"
+      },
+      "id": "process-sheet-status-code",
+      "name": "Process Sheet Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.sheetExists }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-sheet-exists-if",
+      "name": "IF Sheet Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        180
+      ]
+    },
+    {
+      "parameters": {
         "operation": "append",
         "documentId": {
           "__rl": true,
@@ -121,14 +177,14 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "ID": "={{ $json.ID }}",
-            "Type": "={{ $json.Type }}",
-            "Date": "={{ $json.Date }}",
-            "Notes": "={{ $json.Notes }}",
-            "Amount": "={{ $json.Amount }}",
-            "% Back": "={{ $json['% Back'] }}",
-            "đ Back": "={{ $json['đ Back'] }}",
-            "ShopSource": "={{ $json.ShopSource }}"
+            "ID": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.ID }}",
+            "Type": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.Type }}",
+            "Date": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.Date }}",
+            "Notes": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.Notes }}",
+            "Amount": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.Amount }}",
+            "% Back": "={{ $('Prepare Sheet Row (for Auto Map)').item.json['% Back'] }}",
+            "đ Back": "={{ $('Prepare Sheet Row (for Auto Map)').item.json['đ Back'] }}",
+            "ShopSource": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.ShopSource }}"
           }
         },
         "options": {
@@ -147,8 +203,35 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
       "position": [
-        900,
+        1780,
         180
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qi7b3ugwTvV969Ar",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Process Sheet Status').item.json.spreadsheetId }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\"requests\":[{\"duplicateSheet\":{\"sourceSheetId\":{{ $('Process Sheet Status').item.json.templateSheetId }},\"newSheetName\":\"{{ $('Process Sheet Status').item.json.targetCycle }}\",\"insertSheetIndex\":0}}]}",
+        "options": {}
+      },
+      "id": "duplicate-template-sheet-http",
+      "name": "Duplicate Template Sheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1560,
+        260
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -204,6 +287,17 @@
     }
   ],
   "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Dynamic Router (Phân luồng User & Cycle)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Dynamic Router (Phân luồng User & Cycle)": {
       "main": [
         [
@@ -237,18 +331,58 @@
       "main": [
         [
           {
-            "node": "GSheets (Append to Cycle Sheet)",
+            "node": "Check Sheet Existence",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Webhook": {
+    "Check Sheet Existence": {
       "main": [
         [
           {
-            "node": "Dynamic Router (Phân luồng User & Cycle)",
+            "node": "Process Sheet Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Sheet Status": {
+      "main": [
+        [
+          {
+            "node": "IF Sheet Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Sheet Exists": {
+      "main": [
+        [
+          {
+            "node": "GSheets (Append to Cycle Sheet)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Duplicate Template Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate Template Sheet": {
+      "main": [
+        [
+          {
+            "node": "GSheets (Append to Cycle Sheet)",
             "type": "main",
             "index": 0
           }
