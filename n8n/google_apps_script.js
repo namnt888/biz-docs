@@ -17,7 +17,6 @@
  */
 
 function handleSpreadsheetChange(e) {
-  // Process all changes (including 'OTHER' from API writes) to trigger formatting and formula replication
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
   const sheetName = sheet.getName();
@@ -27,8 +26,23 @@ function handleSpreadsheetChange(e) {
     return;
   }
   
+  const lastRow = sheet.getLastRow();
+  const changeType = e ? e.changeType : 'OTHER';
+  
+  // Prevent infinite loops on script-triggered updates (changeType === 'OTHER')
+  if (changeType === 'OTHER') {
+    const cache = CacheService.getScriptCache();
+    const cacheKey = "formatted_" + sheetName + "_" + lastRow;
+    if (cache.get(cacheKey) === "true") {
+      return; // Already formatted this state, skip to prevent recursive loop
+    }
+    // Set cache flag before modifying sheet to block recursive onChange events
+    cache.put(cacheKey, "true", 60);
+  }
+  
   formatAndSortSheet(sheet);
 }
+
 
 function formatAndSortSheet(sheet) {
   const lastRow = sheet.getLastRow();
