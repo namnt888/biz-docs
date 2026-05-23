@@ -189,7 +189,7 @@
         },
         "options": {
           "valueInputOption": "USER_ENTERED",
-          "useAppend": true,
+          "useAppend": false,
           "locationDefine": {
             "values": {
               "headerRow": 3,
@@ -267,7 +267,7 @@
         },
         "options": {
           "valueInputOption": "USER_ENTERED",
-          "useAppend": true
+          "useAppend": false
         }
       },
       "id": "5e6f7g8h-gsheet-debt",

@@ -1,14 +1,14 @@
 ---
 type: person_year
-person_id: 61e485b2-eb71-4ec1-95a0-86c2a1609347
-person_name: Ashley
-year: 2025
+person_id: ""
+person_name: "{{title}}"
+year: {{date:YYYY}}
 ---
-# 👤 [[Ashley]] — 2025
+# 👤 [[{{title}}]] — {{date:YYYY}}
 
-[← Trở về trang chính](../Ashley.md)
+[← Trở về trang chính](../{{title}}.md)
 
-## 📜 Giao dịch 2025 (phân theo tháng)
+## 📜 Giao dịch {{date:YYYY}} (phân theo tháng)
 
 ```dataviewjs
 const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";

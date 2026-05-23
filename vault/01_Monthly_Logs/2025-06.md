@@ -60,13 +60,33 @@ if (txnRes.ok && peopleRes.ok && accRes.ok) {
           pLink,
           accLink,
           typeLabel,
-          `**${amt.toLocaleString()} đ**`,
+          `**${amt.toLocaleString()}**`,
           cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
-          `**${net.toLocaleString()} đ**`,
+          `**${net.toLocaleString()}**`,
           t.note || "-"
         ];
       })
     );
+
+    // Apply styled headers & borders
+    setTimeout(() => {
+      const containerEl = dv.container;
+      const tables = containerEl.querySelectorAll('table');
+      tables.forEach(table => {
+        table.style.borderCollapse = 'collapse';
+        table.style.width = '100%';
+        table.querySelectorAll('th').forEach(th => {
+          th.style.border = '1px solid var(--border-color, #cbd5e1)';
+          th.style.backgroundColor = 'var(--background-secondary-alt, #2b6cb0)';
+          th.style.color = 'var(--text-normal, #ffffff)';
+          th.style.padding = '8px';
+        });
+        table.querySelectorAll('td').forEach(td => {
+          td.style.border = '1px solid var(--border-color, #e2e8f0)';
+          td.style.padding = '8px';
+        });
+      });
+    }, 200);
   } else {
     dv.paragraph("Chưa có giao dịch nào được thêm gần đây.");
   }
@@ -140,7 +160,7 @@ if (!month) {
         }
       });
       
-      dv.paragraph(`📊 **Tổng Thu:** ${totalIn.toLocaleString()} đ &nbsp;|&nbsp; **Tổng Chi:** ${totalOut.toLocaleString()} đ &nbsp;|&nbsp; **Tổng Hoàn tiền:** ${totalCB.toLocaleString()} đ`);
+      dv.paragraph(`📊 **Tổng Thu:** ${totalIn.toLocaleString()} &nbsp;|&nbsp; **Tổng Chi:** ${totalOut.toLocaleString()} &nbsp;|&nbsp; **Tổng Hoàn tiền:** ${totalCB.toLocaleString()}`);
 
       dv.table(
         ["ID", "Ngày", "Người", "Tài khoản", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
@@ -165,15 +185,35 @@ if (!month) {
             pLink,
             accLink,
             typeLabel,
-            `**${amt.toLocaleString()} đ**`,
+            `**${amt.toLocaleString()}**`,
             cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
-            cbFixed > 0 ? `${cbFixed.toLocaleString()} đ` : '-',
-            cbSum > 0 ? `${cbSum.toLocaleString()} đ` : '-',
-            `**${net.toLocaleString()} đ**`,
+            cbFixed > 0 ? `${cbFixed.toLocaleString()}` : '-',
+            cbSum > 0 ? `${cbSum.toLocaleString()}` : '-',
+            `**${net.toLocaleString()}**`,
             t.note || "-"
           ];
         })
       );
+
+      // Apply styled headers & borders
+      setTimeout(() => {
+        const containerEl = dv.container;
+        const tables = containerEl.querySelectorAll('table');
+        tables.forEach(table => {
+          table.style.borderCollapse = 'collapse';
+          table.style.width = '100%';
+          table.querySelectorAll('th').forEach(th => {
+            th.style.border = '1px solid var(--border-color, #cbd5e1)';
+            th.style.backgroundColor = 'var(--background-secondary-alt, #2b6cb0)';
+            th.style.color = 'var(--text-normal, #ffffff)';
+            th.style.padding = '8px';
+          });
+          table.querySelectorAll('td').forEach(td => {
+            td.style.border = '1px solid var(--border-color, #e2e8f0)';
+            td.style.padding = '8px';
+          });
+        });
+      }, 200);
     }
   } else {
     dv.paragraph("❌ Lỗi tải dữ liệu giao dịch từ Supabase.");
