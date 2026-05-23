@@ -1,95 +1,254 @@
 {
-  "name": "Supabase to Google Sheets Sync (Obsidian Money)",
+  "name": "Supabase to GSheets (Dynamic Cycle & Multi-User) v1.5.1",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "supabase-transaction-webhook",
+        "path": "supabase-multi-webhook",
         "options": {}
       },
-      "id": "e83e5828-5694-4d1a-85b4-d5395a14d5f0",
-      "name": "Webhook (Supabase Trigger)",
+      "id": "1a2b3c4d-webhook",
+      "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [ 240, 300 ],
-      "webhookId": "obsidian-money-sync-webhook"
+      "position": [
+        0,
+        300
+      ]
     },
     {
       "parameters": {
-        "operation": "append",
-        "sheetId": {
-          "__rl": true,
-          "value": "YOUR_SPREADSHEET_ID_HERE",
-          "mode": "id"
-        },
-        "range": "Transactions!A:J",
-        "options": {
-          "valueInputOption": "USER_ENTERED"
-        },
-        "fields": {
-          "values": [
+        "jsCode": "const payload = $json.body ?? $json;\nconst record = payload.record || {};\nconst table = payload.table || '';\n\nconst metadata = record.metadata || {};\nconst personName = metadata.person_name || 'Me';\nconst targetSpreadsheetId = metadata.sheet_id || $env.SHEET_ID_DEFAULT || '';\nconst targetCycle = metadata.cycle_tag || metadata.debt_cycle_tag || metadata.statement_cycle_tag || record.debt_cycle || 'Uncategorized';\n\nif (!targetSpreadsheetId) {\n  throw new Error(`Missing spreadsheet id for person '${personName}'`);\n}\n\nlet dateFormatted = '';\nif (record.created_at) {\n  const d = new Date(record.created_at);\n  const dd = String(d.getDate()).padStart(2, '0');\n  const mm = String(d.getMonth() + 1).padStart(2, '0');\n  dateFormatted = `${dd}-${mm}`;\n} else if (metadata.date) {\n  dateFormatted = metadata.date;\n}\n\nconst typeDisplay = record.type_display || record.type || '';\nconst notesValue = record.note || record.notes || '';\nconst shopSource = metadata.shop_source || record.shop_source || '';\nconst cashbackPct = record.cashback_share_percent ? Math.round(record.cashback_share_percent * 100) : 0;\nconst finalPrice = metadata.final_price || record.final_price || record.amount || 0;\n\nreturn {\n  json: {\n    spreadsheetId: targetSpreadsheetId,\n    tableName: table,\n    cycle: targetCycle,\n    dateFormatted,\n    typeDisplay,\n    notesValue,\n    shopSource,\n    cashbackPct,\n    finalPrice,\n    data: record\n  }\n};"
+      },
+      "id": "2b3c4d5e-router",
+      "name": "Dynamic Router (Phân luồng User & Cycle)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.tableName }}",
+        "rules": {
+          "rules": [
             {
-              "column": "A",
-              "value": "={{ $json.body.record.id }}"
+              "value2": "transactions",
+              "output": 0
             },
             {
-              "column": "B",
-              "value": "={{ $json.body.record.type }}"
-            },
-            {
-              "column": "C",
-              "value": "={{ $json.body.record.occurred_at }}"
-            },
-            {
-              "column": "D",
-              "value": "={{ $json.body.record.metadata.shop_id || '' }}"
-            },
-            {
-              "column": "E",
-              "value": "={{ $json.body.record.note }}"
-            },
-            {
-              "column": "F",
-              "value": "={{ $json.body.record.amount }}"
-            },
-            {
-              "column": "G",
-              "value": "={{ $json.body.record.cashback_share_percent || 0 }}"
-            },
-            {
-              "column": "H",
-              "value": "={{ $json.body.record.cashback_share_fixed || 0 }}"
-            },
-            {
-              "column": "I",
-              "value": "={{ $json.body.record.metadata.final_price || $json.body.record.amount }}"
-            },
-            {
-              "column": "J",
-              "value": "={{ $json.body.record.metadata.debt_cycle_tag || '' }}"
+              "value2": "debts",
+              "output": 1
             }
           ]
         }
       },
-      "id": "8db34ec5-5682-4148-8df0-7690680a6538",
-      "name": "Google Sheets (Append Transaction)",
+      "id": "3c4d5e6f-switch",
+      "name": "Switch (Check Table)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "ID",
+              "value": "={{ $json.data.id }}"
+            },
+            {
+              "name": "Type",
+              "value": "={{ $json.typeDisplay }}"
+            },
+            {
+              "name": "Date",
+              "value": "={{ $json.dateFormatted }}"
+            },
+            {
+              "name": "Notes",
+              "value": "={{ $json.notesValue }}"
+            },
+            {
+              "name": "Amount",
+              "value": "={{ $json.data.amount }}"
+            },
+            {
+              "name": "% Back",
+              "value": "={{ $json.cashbackPct }}"
+            },
+            {
+              "name": "đ Back",
+              "value": "={{ $json.data.cashback_share_fixed || 0 }}"
+            },
+            {
+              "name": "ShopSource",
+              "value": "={{ $json.shopSource }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3d4e5f6g-prepare-row",
+      "name": "Prepare Sheet Row (for Auto Map)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        660,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Dynamic Router (Phân luồng User & Cycle)').item.json.cycle }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json.ID }}",
+            "Type": "={{ $json.Type }}",
+            "Date": "={{ $json.Date }}",
+            "Notes": "={{ $json.Notes }}",
+            "Amount": "={{ $json.Amount }}",
+            "% Back": "={{ $json['% Back'] }}",
+            "đ Back": "={{ $json['đ Back'] }}",
+            "ShopSource": "={{ $json.ShopSource }}"
+          }
+        },
+        "options": {
+          "valueInputOption": "USER_ENTERED",
+          "useAppend": true,
+          "locationDefine": {
+            "values": {
+              "headerRow": 3,
+              "firstDataRow": 4
+            }
+          }
+        }
+      },
+      "id": "4d5e6f7g-gsheet-txn",
+      "name": "GSheets (Append to Cycle Sheet)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [ 560, 300 ],
+      "position": [
+        900,
+        180
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "YOUR_CREDENTIAL_ID",
+          "id": "qi7b3ugwTvV969Ar",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Debts_Master",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json.data.id }}",
+            "transaction_id": "={{ $json.data.transaction_id || '' }}",
+            "creditor": "={{ $json.data.creditor }}",
+            "debtor": "={{ $json.data.debtor }}",
+            "amount": "={{ $json.data.amount }}",
+            "cycle": "={{ $json.cycle }}",
+            "status": "={{ $json.data.status }}"
+          }
+        },
+        "options": {
+          "valueInputOption": "USER_ENTERED",
+          "useAppend": true
+        }
+      },
+      "id": "5e6f7g8h-gsheet-debt",
+      "name": "GSheets (Append DEBT)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        700,
+        420
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qi7b3ugwTvV969Ar",
           "name": "Google Sheets account"
         }
       }
     }
   ],
   "connections": {
-    "Webhook (Supabase Trigger)": {
+    "Dynamic Router (Phân luồng User & Cycle)": {
       "main": [
         [
           {
-            "node": "Google Sheets (Append Transaction)",
+            "node": "Switch (Check Table)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch (Check Table)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Sheet Row (for Auto Map)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GSheets (Append DEBT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Sheet Row (for Auto Map)": {
+      "main": [
+        [
+          {
+            "node": "GSheets (Append to Cycle Sheet)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Dynamic Router (Phân luồng User & Cycle)",
             "type": "main",
             "index": 0
           }
@@ -97,7 +256,7 @@
       ]
     }
   },
-  "settings": {
-    "executionOrder": "v1"
-  }
+  "active": true,
+  "settings": {},
+  "versionId": "v1.5.1"
 }
