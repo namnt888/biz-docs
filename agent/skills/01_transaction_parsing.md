@@ -166,6 +166,20 @@ Ngày 5.5 Shopee
 
 ---
 
+## Tự động tạo Account Page trong Obsidian khi tạo Account mới (BẮT BUỘC)
+- Khi đồng bộ/thêm giao dịch mà tài khoản thanh toán (`back_source`) chưa tồn tại, hệ thống sẽ tự động tạo một tài khoản (`account`) mới trên Supabase.
+- **BẮT BUỘC**: Agent phải tạo ngay một file Markdown tương ứng trong thư mục `vault/02_Accounts/` với tên file là `<Tên_tài_khoản>.md` dựa theo template của [MoMo.md](file:///Users/rei/Github/biz-docs/vault/02_Accounts/MoMo.md).
+- Trang tài khoản mới phải có frontmatter chứa đúng `id` của tài khoản vừa được tạo trong database:
+  ```yaml
+  ---
+  type: account
+  id: <ID_tài_khoản_vừa_tạo_trong_DB>
+  ---
+  ```
+- Thiết kế này đảm bảo DataviewJS trong file Markdown có thể tự động truy vấn và hiển thị số dư, cashback, và lịch sử giao dịch của tài khoản đó từ Supabase mà không cần thao tác thủ công.
+
+---
+
 ## Sync Gate — Bắt buộc n8n confirm trước khi mark synced
 - Insert Supabase → `synced_at = NULL`
 - Trigger n8n webhook

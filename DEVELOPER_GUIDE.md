@@ -129,4 +129,5 @@ Supabase DB → CLI Script → n8n Webhook → Google Sheets API
 5. **NEVER use the n8n GSheets Append node** for writing transactions. Always use raw `values:batchUpdate` with disjoint ranges to preserve formula columns.
 6. When syncing transactions, **always show a preview table** to the user before submitting.
 7. **Always use `NODE_OPTIONS="--dns-result-order=ipv4first"`** when starting n8n or running scripts that call Google APIs, to avoid connection timeouts due to unroutable IPv6 addresses.
+8. **Create Obsidian Account Pages for New Accounts**: Whenever a new account is registered in the database, immediately create its corresponding markdown file in `vault/02_Accounts/<Account_Name>.md` copying the template from [MoMo.md](file:///Users/rei/Github/biz-docs/vault/02_Accounts/MoMo.md) with the correct `id` in the frontmatter.
 
