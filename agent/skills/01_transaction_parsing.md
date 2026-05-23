@@ -238,9 +238,9 @@ Webhook (POST, responseMode=lastNode)
 # Import JSON vào n8n SQLite database:
 python3 n8n/import_and_activate.py
 
-# Restart n8n để load workflow mới:
+# Restart n8n để load workflow mới (BẮT BUỘC thêm NODE_OPTIONS để tránh lỗi kết nối IPv6 của Google API bị treo):
 lsof -ti :5678 | xargs kill 2>/dev/null
-node $(which n8n) start > n8n/n8n_run.log 2>&1 &
+NODE_OPTIONS="--dns-result-order=ipv4first" node $(which n8n) start > n8n/n8n_run.log 2>&1 &
 ```
 
 ### Auto-Create Sheet Tab (Template Cloning)

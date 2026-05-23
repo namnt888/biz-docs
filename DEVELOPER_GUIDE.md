@@ -128,4 +128,5 @@ Supabase DB → CLI Script → n8n Webhook → Google Sheets API
 4. Suppress verbose console outputs and maintain error safety for all network calls.
 5. **NEVER use the n8n GSheets Append node** for writing transactions. Always use raw `values:batchUpdate` with disjoint ranges to preserve formula columns.
 6. When syncing transactions, **always show a preview table** to the user before submitting.
+7. **Always use `NODE_OPTIONS="--dns-result-order=ipv4first"`** when starting n8n or running scripts that call Google APIs, to avoid connection timeouts due to unroutable IPv6 addresses.
 
