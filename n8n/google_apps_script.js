@@ -17,11 +17,7 @@
  */
 
 function handleSpreadsheetChange(e) {
-  // Only process row insertion or cell edit events
-  if (e && e.changeType !== 'INSERT_ROW' && e.changeType !== 'EDIT') {
-    return;
-  }
-  
+  // Process all changes (including 'OTHER' from API writes) to trigger formatting and formula replication
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
   const sheetName = sheet.getName();

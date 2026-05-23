@@ -5,6 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "supabase-multi-webhook",
+        "responseMode": "lastNode",
         "options": {}
       },
       "id": "1a2b3c4d-webhook",
