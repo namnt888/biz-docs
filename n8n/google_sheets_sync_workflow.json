@@ -1,5 +1,5 @@
 {
-  "name": "Supabase to GSheets (Dynamic Cycle & Multi-User) v1.5.1",
+  "name": "Supabase to GSheets (Dynamic Cycle & Multi-User) v1.6.0",
   "nodes": [
     {
       "parameters": {
@@ -164,47 +164,58 @@
     },
     {
       "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "={{ $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId }}",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "={{ $('Dynamic Router (Phân luồng User & Cycle)').item.json.cycle }}",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "ID": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.ID }}",
-            "Type": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.Type }}",
-            "Date": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.Date }}",
-            "Notes": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.Notes }}",
-            "Amount": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.Amount }}",
-            "% Back": "={{ $('Prepare Sheet Row (for Auto Map)').item.json['% Back'] }}",
-            "đ Back": "={{ $('Prepare Sheet Row (for Auto Map)').item.json['đ Back'] }}",
-            "ShopSource": "={{ $('Prepare Sheet Row (for Auto Map)').item.json.ShopSource }}"
-          }
-        },
-        "options": {
-          "valueInputOption": "USER_ENTERED",
-          "useAppend": false,
-          "locationDefine": {
-            "values": {
-              "headerRow": 3,
-              "firstDataRow": 4
-            }
-          }
-        }
+        "method": "GET",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId }}/values/{{ encodeURIComponent(\"'\" + $('Dynamic Router (Phân luồng User & Cycle)').item.json.cycle + \"'!A3:A\") }}?majorDimension=COLUMNS",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
       },
-      "id": "4d5e6f7g-gsheet-txn",
-      "name": "GSheets (Append to Cycle Sheet)",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4,
+      "id": "get-row-count-http",
+      "name": "Get Current Row Count",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
       "position": [
         1780,
+        180
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qi7b3ugwTvV969Ar",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const values = $json.values || [];\nconst colA = values[0] || [];\nconst nextRow = Math.max(4, 3 + colA.length);\n\nconst cycle = $('Dynamic Router (Phân luồng User & Cycle)').item.json.cycle;\nconst spreadsheetId = $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId;\nconst row = $('Prepare Sheet Row (for Auto Map)').item.json;\n\nreturn {\n  json: {\n    spreadsheetId,\n    nextRow,\n    batchPayload: {\n      valueInputOption: 'USER_ENTERED',\n      data: [\n        {\n          range: `'${cycle}'!A${nextRow}:C${nextRow}`,\n          values: [[row.ID, row.Type, row.Date]]\n        },\n        {\n          range: `'${cycle}'!E${nextRow}:H${nextRow}`,\n          values: [[row.Notes, row.Amount, row['% Back'], row['đ Back']]]\n        },\n        {\n          range: `'${cycle}'!K${nextRow}`,\n          values: [[row.ShopSource]]\n        }\n      ]\n    }\n  }\n};"
+      },
+      "id": "build-write-payload-code",
+      "name": "Build Write Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.spreadsheetId }}/values:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.batchPayload) }}",
+        "options": {}
+      },
+      "id": "write-txn-preserve-formulas",
+      "name": "Write Transaction (Preserve Formulas)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        2220,
         180
       ],
       "credentials": {
@@ -365,7 +376,7 @@
       "main": [
         [
           {
-            "node": "GSheets (Append to Cycle Sheet)",
+            "node": "Get Current Row Count",
             "type": "main",
             "index": 0
           }
@@ -383,7 +394,29 @@
       "main": [
         [
           {
-            "node": "GSheets (Append to Cycle Sheet)",
+            "node": "Get Current Row Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Current Row Count": {
+      "main": [
+        [
+          {
+            "node": "Build Write Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Write Payload": {
+      "main": [
+        [
+          {
+            "node": "Write Transaction (Preserve Formulas)",
             "type": "main",
             "index": 0
           }
@@ -393,5 +426,5 @@
   },
   "active": true,
   "settings": {},
-  "versionId": "v1.5.1"
+  "versionId": "v1.6.0"
 }
