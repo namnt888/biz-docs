@@ -6,7 +6,6 @@
     {
       "title": "Example form",
       "name": "example-form",
-      "version": "1",
       "fields": [
         {
           "name": "name",
@@ -102,7 +101,6 @@
           "input": {
             "type": "multiselect",
             "source": "fixed",
-            "allowUnknownValues": false,
             "multi_select_options": [
               "Android",
               "iOS",
@@ -111,7 +109,8 @@
               "Linux",
               "Solaris",
               "MS2"
-            ]
+            ],
+            "allowUnknownValues": false
           }
         },
         {
@@ -237,8 +236,8 @@
           "description": "Upload a profile picture. It will be saved in the attachments folder with the current date.",
           "input": {
             "type": "image",
-            "saveLocation": "attachments/profile_pictures",
-            "filenameTemplate": "profile-{{datetime}}.png"
+            "filenameTemplate": "profile-{{datetime}}.png",
+            "saveLocation": "attachments/profile_pictures"
           }
         },
         {
@@ -260,7 +259,8 @@
             "body": "return `Hello ${form.name}!<br> Your best friend is <b>${form.best_fried}</b>`"
           }
         }
-      ]
+      ],
+      "version": "1"
     }
   ]
 }

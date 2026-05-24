@@ -29,9 +29,9 @@ const headers = {
 };
 
 const [txnRes, peopleRes, accRes] = await Promise.all([
-  fetch(`${SUPABASE_URL}/rest/v1/transactions?order=created_at.desc&limit=5&t=${Date.now()}`, { headers }),
-  fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name&t=${Date.now()}`, { headers }),
-  fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name&t=${Date.now()}`, { headers })
+  fetch(`${SUPABASE_URL}/rest/v1/transactions?order=created_at.desc&limit=5`, { headers }),
+  fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name`, { headers }),
+  fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name`, { headers })
 ]);
 
 if (txnRes.ok && peopleRes.ok && accRes.ok) {
@@ -140,9 +140,9 @@ if (!month) {
   const endDate = `${month}-${String(lastDay).padStart(2, '0')}T23:59:59Z`;
 
   const [txnRes, peopleRes, accRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/transactions?occurred_at=gte.${startDate}&occurred_at=lte.${endDate}&order=occurred_at.desc&t=${Date.now()}`, { headers }),
-    fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name&t=${Date.now()}`, { headers }),
-    fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name&t=${Date.now()}`, { headers })
+    fetch(`${SUPABASE_URL}/rest/v1/transactions?occurred_at=gte.${startDate}&occurred_at=lte.${endDate}&order=occurred_at.desc`, { headers }),
+    fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name`, { headers }),
+    fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name`, { headers })
   ]);
 
   if (txnRes.ok && peopleRes.ok && accRes.ok) {

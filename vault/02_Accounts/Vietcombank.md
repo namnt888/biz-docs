@@ -22,8 +22,8 @@ const headers = {
 const accId = dv.current().id;
 
 const [accRes, txnRes] = await Promise.all([
-  fetch(`${SUPABASE_URL}/rest/v1/accounts?id=eq.${accId}&t=${Date.now()}`, { headers }),
-  fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${accId}&t=${Date.now()}`, { headers })
+  fetch(`${SUPABASE_URL}/rest/v1/accounts?id=eq.${accId}`, { headers }),
+  fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${accId}`, { headers })
 ]);
 
 if (accRes.ok && txnRes.ok) {
@@ -66,7 +66,7 @@ const headers = {
 };
 
 const accId = dv.current().id;
-const res = await fetch(`${SUPABASE_URL}/rest/v1/cashback_cycles?account_id=eq.${accId}&order=cycle_tag.desc&t=${Date.now()}`, { headers });
+const res = await fetch(`${SUPABASE_URL}/rest/v1/cashback_cycles?account_id=eq.${accId}&order=cycle_tag.desc`, { headers });
 
 if (res.ok) {
   const cycles = await res.json();
@@ -97,7 +97,7 @@ const headers = {
 };
 
 const accId = dv.current().id;
-const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${accId}&order=occurred_at.desc&limit=20&t=${Date.now()}`, { headers });
+const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${accId}&order=occurred_at.desc&limit=20`, { headers });
 
 if (res.ok) {
   const txns = await res.json();

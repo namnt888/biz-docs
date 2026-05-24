@@ -52,7 +52,7 @@ btnReset.style.color = "#e63946";
 btnReset.style.border = "1px solid #e63946";
 
 async function checkStatus() {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}&synced_at=is.null&t=${Date.now()}`, { headers });
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}&synced_at=is.null`, { headers });
   if (res.ok) {
     const data = await res.json();
     statusText.innerText = `📊 Trạng thái: Có ${data.length} giao dịch chưa đồng bộ lên Google Sheet.`;
@@ -67,7 +67,7 @@ btnSync.onclick = async () => {
   btnSync.disabled = true;
   statusText.innerText = "⏳ Đang gửi yêu cầu đồng bộ...";
   
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}&synced_at=is.null&select=*,people(sheet_id,name)&t=${Date.now()}`, { headers });
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}&synced_at=is.null&select=*,people(sheet_id,name)`, { headers });
   if (!res.ok) {
     statusText.innerText = "❌ Lỗi khi tải danh sách giao dịch.";
     btnSync.disabled = false;
@@ -110,7 +110,7 @@ btnSync.onclick = async () => {
       
       if (syncRes.ok) {
         count++;
-        await fetch(`${SUPABASE_URL}/rest/v1/transactions?id=eq.${t.id}&t=${Date.now()}`, {
+        await fetch(`${SUPABASE_URL}/rest/v1/transactions?id=eq.${t.id}`, {
           method: "PATCH",
           headers,
           body: JSON.stringify({ synced_at: new Date().toISOString() })
@@ -131,7 +131,7 @@ btnReset.onclick = async () => {
   }
   
   statusText.innerText = "⏳ Đang reset...";
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}&t=${Date.now()}`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}`, {
     method: "PATCH",
     headers,
     body: JSON.stringify({ synced_at: null })
@@ -165,7 +165,7 @@ const headers = {
 };
 
 const personId = dv.current().id;
-const res = await fetch(`${SUPABASE_URL}/rest/v1/debts?person_id=eq.${personId}&order=occurred_at.desc&t=${Date.now()}`, { headers });
+const res = await fetch(`${SUPABASE_URL}/rest/v1/debts?person_id=eq.${personId}&order=occurred_at.desc`, { headers });
 
 if (res.ok) {
   const rawDebts = await res.json();

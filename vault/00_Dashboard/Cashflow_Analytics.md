@@ -23,7 +23,7 @@ try {
   'Cache-Control': 'no-cache',
   'Pragma': 'no-cache'
 };
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?select=*&occurred_at=gte.${firstDay}&order=occurred_at.desc&t=${Date.now()}`, { headers });
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?select=*&occurred_at=gte.${firstDay}&order=occurred_at.desc`, { headers });
   
   if (res.ok) {
     const txns = await res.json();

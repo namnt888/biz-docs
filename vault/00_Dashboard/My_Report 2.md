@@ -66,9 +66,9 @@ try {
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   
   const [txnRes, peopleRes, accRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/transactions?occurred_at=gte.${firstDay}&order=occurred_at.desc&t=${Date.now()}`, { headers }),
-    fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name&t=${Date.now()}`, { headers }),
-    fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name&t=${Date.now()}`, { headers })
+    fetch(`${SUPABASE_URL}/rest/v1/transactions?occurred_at=gte.${firstDay}&order=occurred_at.desc`, { headers }),
+    fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name`, { headers }),
+    fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name`, { headers })
   ]);
   
   if (txnRes.ok && peopleRes.ok && accRes.ok) {
@@ -156,8 +156,8 @@ try {
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   
   const [txnRes, accRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/transactions?occurred_at=gte.${firstDay}&order=occurred_at.desc&t=${Date.now()}`, { headers }),
-    fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name&t=${Date.now()}`, { headers })
+    fetch(`${SUPABASE_URL}/rest/v1/transactions?occurred_at=gte.${firstDay}&order=occurred_at.desc`, { headers }),
+    fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name`, { headers })
   ]);
 
   if (txnRes.ok && accRes.ok) {
@@ -230,9 +230,9 @@ try {
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   
   const [txnRes, peopleRes, accRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/transactions?occurred_at=gte.${firstDay}&order=occurred_at.desc&t=${Date.now()}`, { headers }),
-    fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name&t=${Date.now()}`, { headers }),
-    fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name&t=${Date.now()}`, { headers })
+    fetch(`${SUPABASE_URL}/rest/v1/transactions?occurred_at=gte.${firstDay}&order=occurred_at.desc`, { headers }),
+    fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name`, { headers }),
+    fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name`, { headers })
   ]);
 
   if (txnRes.ok && peopleRes.ok && accRes.ok) {

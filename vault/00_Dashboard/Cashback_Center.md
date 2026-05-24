@@ -21,8 +21,8 @@ try {
   'Pragma': 'no-cache'
 };
   const [cyclesRes, accountsRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/cashback_cycles?select=*&status=eq.active&order=cycle_tag.desc&t=${Date.now()}`, { headers }),
-    fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name&t=${Date.now()}`, { headers })
+    fetch(`${SUPABASE_URL}/rest/v1/cashback_cycles?select=*&status=eq.active&order=cycle_tag.desc`, { headers }),
+    fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name`, { headers })
   ]);
   
   if (cyclesRes.ok && accountsRes.ok) {
@@ -70,7 +70,7 @@ try {
   'Cache-Control': 'no-cache',
   'Pragma': 'no-cache'
 };
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/cashback_entries?select=*,transactions(note,amount,occurred_at)&order=created_at.desc&limit=15&t=${Date.now()}`, { headers });
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/cashback_entries?select=*,transactions(note,amount,occurred_at)&order=created_at.desc&limit=15`, { headers });
   
   if (res.ok) {
     const entries = await res.json();

@@ -21,8 +21,8 @@ try {
   'Pragma': 'no-cache'
 };
   const [debtsRes, peopleRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/debts?select=*&t=${Date.now()}`, { headers }),
-    fetch(`${SUPABASE_URL}/rest/v1/people?select=*&t=${Date.now()}`, { headers })
+    fetch(`${SUPABASE_URL}/rest/v1/debts?select=*`, { headers }),
+    fetch(`${SUPABASE_URL}/rest/v1/people?select=*`, { headers })
   ]);
   
   if (debtsRes.ok && peopleRes.ok) {
@@ -91,8 +91,8 @@ try {
   'Pragma': 'no-cache'
 };
   const [debtsRes, peopleRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/debts?select=*&status=in.(pending,partial)&order=occurred_at.asc&t=${Date.now()}`, { headers }),
-    fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name&t=${Date.now()}`, { headers })
+    fetch(`${SUPABASE_URL}/rest/v1/debts?select=*&status=in.(pending,partial)&order=occurred_at.asc`, { headers }),
+    fetch(`${SUPABASE_URL}/rest/v1/people?select=id,name`, { headers })
   ]);
   
   if (debtsRes.ok && peopleRes.ok) {
