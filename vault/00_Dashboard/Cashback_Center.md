@@ -13,7 +13,13 @@ const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
 
 try {
-  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+  const headers = { 
+  'apikey': SUPABASE_ANON_KEY, 
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache'
+};
   const [cyclesRes, accountsRes] = await Promise.all([
     fetch(`${SUPABASE_URL}/rest/v1/cashback_cycles?select=*&status=eq.active&order=cycle_tag.desc`, { headers }),
     fetch(`${SUPABASE_URL}/rest/v1/accounts?select=id,name`, { headers })
@@ -57,7 +63,13 @@ const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
 
 try {
-  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+  const headers = { 
+  'apikey': SUPABASE_ANON_KEY, 
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache'
+};
   const res = await fetch(`${SUPABASE_URL}/rest/v1/cashback_entries?select=*,transactions(note,amount,occurred_at)&order=created_at.desc&limit=15`, { headers });
   
   if (res.ok) {

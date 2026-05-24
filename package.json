@@ -7,6 +7,7 @@
     "dev": "npm run dev --prefix agent",
     "watch-vault": "npm run watch-vault --prefix agent",
     "generate-pages": "npm run generate-pages --prefix agent",
-    "cli": "npm run cli --prefix agent"
+    "cli": "npm run cli --prefix agent",
+    "sheet:push": "node google-sheets/push-sheet.mjs --prefix PEOPLE_SHEET_"
   }
 }

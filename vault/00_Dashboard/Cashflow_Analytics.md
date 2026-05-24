@@ -16,7 +16,13 @@ try {
   const now = new Date();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   
-  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+  const headers = { 
+  'apikey': SUPABASE_ANON_KEY, 
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache'
+};
   const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?select=*&occurred_at=gte.${firstDay}&order=occurred_at.desc`, { headers });
   
   if (res.ok) {

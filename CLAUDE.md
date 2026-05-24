@@ -97,14 +97,43 @@ The daemon toast notifications will appear on macOS:
 No manual action needed. Just paste and wait ~5 seconds.
 
 ## AUTOMATED AGENT WORKFLOW (FOR AGENTS)
-When the user asks you to "add a transaction", "test transaction sync", or "sync monthly logs", you must perform the following steps autonomously:
-1. **Write to File**: Append the transaction lines to `vault/01_Monthly_Logs/YYYY-MM.md` under the `## 📥 Unsynced Transactions` section.
-2. **Check Daemon Status**: Run `ps aux | grep "tsx src/daemon.ts"` to check if the daemon is running.
-3. **Handle Daemon/Sync**:
-   - If the daemon is NOT running, start it in the background: `cd agent && npm run watch-vault` (asynchronously).
-   - In all cases, to ensure immediate execution, trigger a manual sync of the file by executing:
-     ```bash
-     cd agent && npx tsx -e "import { processDailyLog } from './src/index'; processDailyLog('../vault/01_Monthly_Logs/YYYY-MM.md').catch(console.error);"
-     ```
-4. **Verify**: Read the monthly log file again to confirm that the transactions have been successfully cleared from the Unsynced section and are now rendered in the Synced section.
+When the user asks you to "add a transaction", "sync transactions", or provides transaction data:
+
+### Flow: Parse → Preview → Approve → Submit → Sync
+1. **Parse**: Extract transactions from user input following rules in `agent/skills/01_transaction_parsing.md`.
+2. **Preview (MANDATORY)**: Display a summary table of ALL parsed transactions BEFORE submitting. Include: Date, Amount, Notes, % CB, Shop Source, Back Source. **Wait for user approval**.
+3. **Submit to Supabase**: Insert each transaction into `transactions` table. Look up `sheet_id` from `people` table first.
+4. **Trigger n8n Webhook**: POST each transaction to the n8n webhook. The webhook URL must be resolved from n8n's SQLite DB (not hardcoded):
+   ```bash
+   sqlite3 /Users/rei/.n8n/database.sqlite "SELECT webhookPath FROM webhook_entity;"
+   ```
+5. **Mark synced**: Only set `synced_at` after webhook returns 200 OK.
+
+### Reference Implementation
+See `agent/src/scripts/sync_transactions_custom.ts` for a complete working example of the parse → insert → webhook flow.
+
+### n8n Sync Architecture (v1.6.0)
+- Workflow JSON: `n8n/google_sheets_sync_workflow.json`
+- Apps Script: `n8n/google_apps_script.js`
+- Import script: `n8n/import_and_activate.py`
+- **CRITICAL**: n8n writes to Google Sheets via raw `values:batchUpdate` API with disjoint ranges (A:C, E:H, K). It NEVER touches columns D, I, J which contain formulas. Do NOT switch back to the n8n GSheets node for writing transactions.
+- Webhook `responseMode` is `lastNode` (sequential execution — prevents duplicate sheet creation).
+
+### Google Sheets Template
+Each person's spreadsheet must have a `Template` tab. When a new cycle (e.g., `2026-06`) is synced for the first time, n8n auto-clones this template.
+
+## IMPORTANT PATHS
+- Vault: `vault/`
+- Agent code: `agent/src/`
+- Monthly logs: `vault/01_Monthly_Logs/`
+- Account pages: `vault/02_Accounts/`
+- People pages: `vault/03_People/`
+- Dashboard: `vault/00_Dashboard/Dashboard.md`
+- Guides: `vault/99_System/Guides/`
+- Blueprint: `vault/99_System/Blueprint.md`
+- Skills: `agent/skills/` (READ THESE FIRST)
+- n8n workflow: `n8n/google_sheets_sync_workflow.json`
+- n8n Apps Script: `n8n/google_apps_script.js`
+- n8n import script: `n8n/import_and_activate.py`
+- n8n SQLite DB: `/Users/rei/.n8n/database.sqlite`
 

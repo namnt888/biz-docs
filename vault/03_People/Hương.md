@@ -8,8 +8,7 @@ id: 00c71cfc-b336-4e94-9362-23b30344bdf4
 
 ## 📂 Giao dịch theo Năm
 
-- [[Hương/2026|📅 2026]]
-- [[Hương/2025|📅 2025]]
+_Chưa có giao dịch nào._
 
 ---
 

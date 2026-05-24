@@ -1,14 +1,14 @@
 ---
 type: person
-id: 61e485b2-eb71-4ec1-95a0-86c2a1609347
+id: 5a6d5ff2-a221-4ce5-b367-c633e29d5390
 ---
-# 👤 Ashley
+# 👤 Tuấn
 
 [👈 Trở về Debt Center](../00_Dashboard/Debt_Center.md)
 
 ## 📂 Giao dịch theo Năm
 
-- [[Ashley/2026|📅 2026]]
+- [[Tuấn/2026|📅 2026]]
 
 ---
 

@@ -11,6 +11,7 @@ export interface TransactionPayload {
   cashback_share_fixed?: number;
   person_id?: string;
   note?: string;
+  cycle_tag?: string;
 }
 
 export class CashbackService {
@@ -77,7 +78,13 @@ export class CashbackService {
     const cbMaxBudget = 500000; // Default 500k VND max budget
     const defaultRate = 0.01; // Default 1% cashback rate
 
-    const { tag, type } = this.getCycleTagAndRange(txn.occurred_at, statementDay);
+    let tag = txn.cycle_tag;
+    let type = 'calendar_month';
+    if (!tag) {
+      const range = this.getCycleTagAndRange(txn.occurred_at, statementDay);
+      tag = range.tag;
+      type = range.type;
+    }
 
     // Ensure cycle exists
     let { data: cycle } = await this.supabase
@@ -122,8 +129,10 @@ export class CashbackService {
     } else if (mode === 'none_back') {
       virtualAmount = Math.round(txn.amount * defaultRate);
     } else if (mode === 'percent') {
-      const sharePercent = txn.cashback_share_percent || 0.5;
-      virtualAmount = Math.round(txn.amount * defaultRate * sharePercent);
+      const sharePercent = txn.cashback_share_percent !== undefined && txn.cashback_share_percent !== null
+        ? txn.cashback_share_percent
+        : 0.005;
+      virtualAmount = Math.round(txn.amount * sharePercent);
     } else if (mode === 'fixed') {
       virtualAmount = txn.cashback_share_fixed || 0;
     } else if (mode === 'real_fixed') {

@@ -92,14 +92,42 @@ Here are the planned features for upcoming sprints:
 - Configure the Obsidian **QuickAdd** plugin or hotkey mapping.
 - Enable the user to hit a shortcut to trigger a Modal Form for quick transaction entry (which appends text to the active monthly log's `Unsynced` section).
 
-### 3. Google Sheets Sync using n8n
-- Build or configure an n8n workflow that triggers whenever a new transaction is inserted in Supabase.
-- Write the transactions automatically to the user's master Google Sheets ledger.
+---
+
+## ✅ Completed: Google Sheets Sync via n8n (v1.6.0)
+
+### Architecture
+```
+Supabase DB → CLI Script → n8n Webhook → Google Sheets API
+                                ↓
+                    Clone Template tab (if new cycle)
+                                ↓
+                    values:batchUpdate (disjoint ranges)
+                                ↓
+                    Apps Script: copy formulas, sort, borders
+```
+
+### Key Design Decisions
+1. **`values:batchUpdate` with disjoint ranges**: n8n writes ONLY to columns A:C, E:H, K. Columns D (Shop VLOOKUP), I (Σ Back formula), J (Final Price formula) are NEVER written to — preserving template formulas.
+2. **`responseMode: lastNode`**: Webhook serializes execution to prevent race conditions when multiple transactions are synced at once (avoids duplicate `_conflict` sheet tabs).
+3. **Google Apps Script `onChange`**: Fires on ALL change types (including API writes `changeType='OTHER'`). Handles: self-healing Row 4 formulas, copying formulas to new rows, setting cell borders, sorting by date.
+4. **Template-based sheet creation**: Each spreadsheet has a `Template` tab. n8n auto-clones it when a new cycle is first synced.
+
+### Files
+- `n8n/google_sheets_sync_workflow.json` — n8n workflow definition (import via `n8n/import_and_activate.py`)
+- `n8n/google_apps_script.js` — Google Apps Script (must be manually pasted into the spreadsheet's Extensions → Apps Script)
+- `agent/src/scripts/sync_transactions_custom.ts` — CLI reference implementation for the full sync flow
+- `agent/skills/01_transaction_parsing.md` — Parsing rules, column layout, and technical reference
 
 ---
 
 ## 🤖 Instructions for the Next Assistant Session
-1. **Always read this guide** before refactoring or writing new queries.
+1. **Always read `agent/skills/` first** before working with transactions or sync.
 2. Check `agent/src/index.ts` to see daemon execution flow and `agent/src/scripts/generate_pages.ts` for vault pages generation.
 3. Keep the styling aesthetic high: use HSL colors, modern typography, glassmorphism, and clean structures in any UI/DataviewJS edits.
 4. Suppress verbose console outputs and maintain error safety for all network calls.
+5. **NEVER use the n8n GSheets Append node** for writing transactions. Always use raw `values:batchUpdate` with disjoint ranges to preserve formula columns.
+6. When syncing transactions, **always show a preview table** to the user before submitting.
+7. **Always use `NODE_OPTIONS="--dns-result-order=ipv4first"`** when starting n8n or running scripts that call Google APIs, to avoid connection timeouts due to unroutable IPv6 addresses.
+8. **Create Obsidian Account Pages for New Accounts**: Whenever a new account is registered in the database, immediately create its corresponding markdown file in `vault/02_Accounts/<Account_Name>.md` copying the template from [MoMo.md](file:///Users/rei/Github/biz-docs/vault/02_Accounts/MoMo.md) with the correct `id` in the frontmatter.
+

@@ -20,7 +20,13 @@ month: "{{title}}"
 ```dataviewjs
 const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
-const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+const headers = { 
+  'apikey': SUPABASE_ANON_KEY, 
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache'
+};
 
 const [txnRes, peopleRes, accRes] = await Promise.all([
   fetch(`${SUPABASE_URL}/rest/v1/transactions?order=created_at.desc&limit=5`, { headers }),
@@ -60,13 +66,33 @@ if (txnRes.ok && peopleRes.ok && accRes.ok) {
           pLink,
           accLink,
           typeLabel,
-          `**${amt.toLocaleString()} đ**`,
+          `**${amt.toLocaleString()}**`,
           cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
-          `**${net.toLocaleString()} đ**`,
+          `**${net.toLocaleString()}**`,
           t.note || "-"
         ];
       })
     );
+
+    // Apply styled headers & borders
+    setTimeout(() => {
+      const containerEl = dv.container;
+      const tables = containerEl.querySelectorAll('table');
+      tables.forEach(table => {
+        table.style.borderCollapse = 'collapse';
+        table.style.width = '100%';
+        table.querySelectorAll('th').forEach(th => {
+          th.style.border = '1px solid var(--border-color, #cbd5e1)';
+          th.style.backgroundColor = 'var(--background-secondary-alt, #2b6cb0)';
+          th.style.color = 'var(--text-normal, #ffffff)';
+          th.style.padding = '8px';
+        });
+        table.querySelectorAll('td').forEach(td => {
+          td.style.border = '1px solid var(--border-color, #e2e8f0)';
+          td.style.padding = '8px';
+        });
+      });
+    }, 200);
   } else {
     dv.paragraph("Chưa có giao dịch nào được thêm gần đây.");
   }
@@ -82,7 +108,13 @@ if (txnRes.ok && peopleRes.ok && accRes.ok) {
 ```dataviewjs
 const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
-const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+const headers = { 
+  'apikey': SUPABASE_ANON_KEY, 
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache'
+};
 
 const monthVal = dv.current().month;
 let month = "";
@@ -140,7 +172,7 @@ if (!month) {
         }
       });
       
-      dv.paragraph(`📊 **Tổng Thu:** ${totalIn.toLocaleString()} đ &nbsp;|&nbsp; **Tổng Chi:** ${totalOut.toLocaleString()} đ &nbsp;|&nbsp; **Tổng Hoàn tiền:** ${totalCB.toLocaleString()} đ`);
+      dv.paragraph(`📊 **Tổng Thu:** ${totalIn.toLocaleString()} &nbsp;|&nbsp; **Tổng Chi:** ${totalOut.toLocaleString()} &nbsp;|&nbsp; **Tổng Hoàn tiền:** ${totalCB.toLocaleString()}`);
 
       dv.table(
         ["ID", "Ngày", "Người", "Tài khoản", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
@@ -165,15 +197,35 @@ if (!month) {
             pLink,
             accLink,
             typeLabel,
-            `**${amt.toLocaleString()} đ**`,
+            `**${amt.toLocaleString()}**`,
             cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
-            cbFixed > 0 ? `${cbFixed.toLocaleString()} đ` : '-',
-            cbSum > 0 ? `${cbSum.toLocaleString()} đ` : '-',
-            `**${net.toLocaleString()} đ**`,
+            cbFixed > 0 ? `${cbFixed.toLocaleString()}` : '-',
+            cbSum > 0 ? `${cbSum.toLocaleString()}` : '-',
+            `**${net.toLocaleString()}**`,
             t.note || "-"
           ];
         })
       );
+
+      // Apply styled headers & borders
+      setTimeout(() => {
+        const containerEl = dv.container;
+        const tables = containerEl.querySelectorAll('table');
+        tables.forEach(table => {
+          table.style.borderCollapse = 'collapse';
+          table.style.width = '100%';
+          table.querySelectorAll('th').forEach(th => {
+            th.style.border = '1px solid var(--border-color, #cbd5e1)';
+            th.style.backgroundColor = 'var(--background-secondary-alt, #2b6cb0)';
+            th.style.color = 'var(--text-normal, #ffffff)';
+            th.style.padding = '8px';
+          });
+          table.querySelectorAll('td').forEach(td => {
+            td.style.border = '1px solid var(--border-color, #e2e8f0)';
+            td.style.padding = '8px';
+          });
+        });
+      }, 200);
     }
   } else {
     dv.paragraph("❌ Lỗi tải dữ liệu giao dịch từ Supabase.");
