@@ -1,15 +1,14 @@
 ---
 type: person
-id: d2496989-6c33-406c-b1ce-cc3b93e9e826
+id: 
 ---
-# 👤 Nam
+# 👤 {{title}}
 
 [👈 Trở về Debt Center](../00_Dashboard/Debt_Center.md)
 
 ## 📂 Giao dịch theo Năm
 
-- [[Nam/2026|📅 2026]]
-- [[Nam/2025|📅 2025]]
+- [[{{title}}/2026|📅 2026]]
 
 ---
 
