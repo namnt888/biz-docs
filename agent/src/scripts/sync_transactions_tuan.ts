@@ -45,7 +45,7 @@ const tuanTxs: TxInput[] = [
     type_display: 'Out',
     amount: 2303921,
     notes: 'Điện T4',
-    cashback_share_percent: 0,
+    cashback_share_percent: 1,
     cashback_share_fixed: 0,
     back_source: 'Uob',
     shop_source: 'Power'
