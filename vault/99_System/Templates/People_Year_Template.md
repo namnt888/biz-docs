@@ -13,7 +13,13 @@ year: {{date:YYYY}}
 ```dataviewjs
 const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
-const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
+const headers = { 
+  'apikey': SUPABASE_ANON_KEY, 
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache'
+};
 
 const personId = dv.current().person_id;
 const year = dv.current().year;
@@ -21,13 +27,13 @@ const startDate = `${year}-01-01T00:00:00Z`;
 const endDate = `${year}-12-31T23:59:59Z`;
 
 // Fetch accounts mapping in parallel
-const accRes = await fetch(`${SUPABASE_URL}/rest/v1/accounts`, { headers });
+const accRes = await fetch(`${SUPABASE_URL}/rest/v1/accounts?t=${Date.now()}`, { headers });
 const accounts = accRes.ok ? await accRes.json() : [];
 const accMap = {};
 accounts.forEach(a => accMap[a.id] = a.name);
 
 const res = await fetch(
-  `${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}&occurred_at=gte.${startDate}&occurred_at=lte.${endDate}&order=occurred_at.desc`,
+  `${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}&occurred_at=gte.${startDate}&occurred_at=lte.${endDate}&order=occurred_at.desc&t=${Date.now()}`,
   { headers }
 );
 
