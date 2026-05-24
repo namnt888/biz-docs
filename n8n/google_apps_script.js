@@ -54,13 +54,13 @@ function formatAndSortSheet(sheet) {
   const j3Range = sheet.getRange("J3");
   
   if (!d3Range.getFormula()) {
-    d3Range.setFormula('={"Shop"; ARRAYFORMULA(IF(ISBLANK(K4:K), "", IFERROR(VLOOKUP(K4:K, Metadata!$A$2:$B, 2, FALSE), K4:K)))}');
+    d3Range.setFormula('={"Shop"; ARRAYFORMULA(IF(ISBLANK(K4:K); ""; IFERROR(VLOOKUP(K4:K; Metadata!$A$2:$B; 2; FALSE); K4:K)))}');
   }
   if (!i3Range.getFormula()) {
-    i3Range.setFormula('={"Σ Back"; ARRAYFORMULA(IF(ISBLANK(F4:F), "", ROUND(F4:F * G4:G / 100 + H4:H)))}');
+    i3Range.setFormula('={"Σ Back"; ARRAYFORMULA(IF(ISBLANK(F4:F); ""; ROUND(F4:F * G4:G / 100 + H4:H)))}');
   }
   if (!j3Range.getFormula()) {
-    j3Range.setFormula('={"Final Price"; ARRAYFORMULA(IF(ISBLANK(F4:F), "", F4:F - I4:I))}');
+    j3Range.setFormula('={"Final Price"; ARRAYFORMULA(IF(ISBLANK(F4:F); ""; F4:F - I4:I))}');
   }
   
   // Clear any accidental formulas in Row 4 to prevent expansion blockage (#REF!)
