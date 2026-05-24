@@ -1,8 +1,8 @@
 ---
 type: account
-id: f1ca1771-b3f3-4206-a5de-a4318efe8b41
+id: d823304a-3784-4dd4-b165-dff2203362c5
 ---
-# 💳 Vietcombank
+# 💳 Tiền mặt
 
 [👈 Trở về Dashboard](../00_Dashboard/Dashboard.md)
 

@@ -1,8 +1,8 @@
 ---
 type: account
-id: f1ca1771-b3f3-4206-a5de-a4318efe8b41
+id: 4cf2a5f0-ea47-4f62-879b-59306722b3f5
 ---
-# 💳 Vietcombank
+# 💳 Shopee
 
 [👈 Trở về Dashboard](../00_Dashboard/Dashboard.md)
 

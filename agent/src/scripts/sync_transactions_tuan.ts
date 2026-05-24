@@ -144,41 +144,70 @@ async function main() {
     const cashbackPct = item.cashback_share_percent > 0 ? item.cashback_share_percent / 100 : null;
     const cashbackFixed = item.cashback_share_fixed > 0 ? item.cashback_share_fixed : null;
 
-    // Insert transaction
-    const { data: insertedTxn, error: insErr } = await supabase
+    // --- Deduplication check: skip insert if already exists ---
+    const { data: existingTxns } = await supabase
       .from('transactions')
-      .insert({
-        occurred_at: item.occurred_at,
-        type: item.type,
-        status: 'posted',
-        amount: item.amount,
-        account_id: accountId,
-        person_id: person.id,
-        note: item.notes,
-        cashback_mode: cashbackMode,
-        cashback_share_percent: cashbackPct,
-        cashback_share_fixed: cashbackFixed,
-        metadata: {
-          person_name: 'Tuấn',
-          sheet_id: person.sheet_id,
-          cycle_tag: item.cycle_tag,
-          date: item.date,
-          shop_source: item.shop_source,
-          final_price: item.amount,
-          back_source: item.back_source,
-          is_installment: false,
-          created_via: 'AIDaemon'
-        }
-      })
-      .select()
-      .single();
+      .select('id, synced_at')
+      .eq('person_id', person.id)
+      .eq('note', item.notes)
+      .gte('occurred_at', item.occurred_at.substring(0, 10))
+      .lte('occurred_at', item.occurred_at.substring(0, 10) + 'T23:59:59+07:00');
 
-    if (insErr) {
-      console.error(`  ❌ DB Insert Error:`, insErr.message);
-      continue;
+    let insertedTxn: { id: string; occurred_at: string; type: string; amount: number; note: string; metadata: any; synced_at: string | null };
+
+    if (existingTxns && existingTxns.length > 0) {
+      const existing = existingTxns[0];
+      if (existing.synced_at) {
+        console.log(`  ⏭️  Already exists & synced (ID: ${existing.id}). Skipping.`);
+        continue;
+      }
+      console.log(`  ⚠️  Already exists but NOT synced (ID: ${existing.id}). Will retry webhook only.`);
+      const { data: fullTxn } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', existing.id)
+        .single();
+      if (!fullTxn) { console.error('  ❌ Could not fetch existing txn.'); continue; }
+      insertedTxn = fullTxn;
+    } else {
+      // Insert transaction
+      const { data: newTxn, error: insErr } = await supabase
+        .from('transactions')
+        .insert({
+          occurred_at: item.occurred_at,
+          type: item.type,
+          status: 'posted',
+          amount: item.amount,
+          account_id: accountId,
+          person_id: person.id,
+          note: item.notes,
+          cashback_mode: cashbackMode,
+          cashback_share_percent: cashbackPct,
+          cashback_share_fixed: cashbackFixed,
+          metadata: {
+            person_name: 'Tuấn',
+            sheet_id: person.sheet_id,
+            cycle_tag: item.cycle_tag,
+            date: item.date,
+            shop_source: item.shop_source,
+            final_price: item.amount,
+            back_source: item.back_source,
+            is_installment: false,
+            created_via: 'AIDaemon'
+          }
+        })
+        .select()
+        .single();
+
+      if (insErr || !newTxn) {
+        console.error(`  ❌ DB Insert Error:`, insErr?.message);
+        continue;
+      }
+
+      console.log(`  ✅ DB Insert success. ID: ${newTxn.id}`);
+      insertedTxn = newTxn;
     }
 
-    console.log(`  ✅ DB Insert success. ID: ${insertedTxn.id}`);
 
     // Trigger n8n webhook
     const payload = {

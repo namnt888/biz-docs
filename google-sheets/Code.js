@@ -82,7 +82,7 @@ function reconcileSheetWithSupabase(sheet, spreadsheetId) {
     const personId = people[0].id;
 
     // 2. Fetch active transactions for this person from Supabase
-    const txUrl = supabaseUrl + "/rest/v1/transactions?person_id=eq." + personId + "&status=not.eq.void&select=id,metadata&order=occurred_at.asc";
+    const txUrl = supabaseUrl + "/rest/v1/transactions?person_id=eq." + personId + "&select=id,metadata&order=occurred_at.asc";
     const tResponse = UrlFetchApp.fetch(txUrl, {
       headers: {
         "apikey": supabaseKey,

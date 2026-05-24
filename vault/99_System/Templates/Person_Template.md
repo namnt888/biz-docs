@@ -1,15 +1,23 @@
 ---
 type: person
-id: 
+id: {{PERSON_UUID_FROM_SUPABASE_PEOPLE_TABLE}}
 ---
-# 👤 {{title}}
+# 👤 {{PERSON_NAME}}
 
 [👈 Trở về Debt Center](../00_Dashboard/Debt_Center.md)
 
+> [!NOTE] **Hướng dẫn agent tạo người mới** — Xóa block này sau khi tạo xong
+> 1. Thay `{{PERSON_NAME}}` bằng tên thật (vd: `Tuấn`)
+> 2. Thay `id:` bằng UUID từ bảng `people` trong Supabase (INSERT nếu chưa có)
+> 3. Tạo subfolder `vault/03_People/{{PERSON_NAME}}/` và copy `People_Year_Template.md` vào thành `{{YEAR}}.md`
+> 4. Điền `person_id` vào frontmatter của file năm đó
+> 5. Đảm bảo người này đã có `sheet_id` trong bảng `people` (link đến Google Sheet riêng)
+> 6. Xóa block NOTE này trước khi lưu file chính thức
+
 ## 📂 Giao dịch theo Năm
 
-- [[{{title}}/2026|📅 2026]]
-- [[{{title}}/2025|📅 2025]]
+- [[{{PERSON_NAME}}/2026|📅 2026]]
+- [[{{PERSON_NAME}}/2025|📅 2025]]
 
 ---
 
@@ -151,6 +159,49 @@ checkStatus();
 
 ---
 
+## 📋 Giao dịch gần đây (10 mới nhất)
+
+```dataviewjs
+const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
+const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' };
+
+const personId = dv.current().id;
+
+const [txnRes, accRes] = await Promise.all([
+  fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}&order=occurred_at.desc&limit=10`, { headers }),
+  fetch(`${SUPABASE_URL}/rest/v1/accounts`, { headers })
+]);
+
+if (!txnRes.ok) {
+  dv.paragraph("❌ Không thể tải giao dịch.");
+} else {
+  const txns = await txnRes.json();
+  const accounts = accRes.ok ? await accRes.json() : [];
+  const accMap = {};
+  accounts.forEach(a => accMap[a.id] = a.name);
+
+  if (txns.length === 0) {
+    dv.paragraph("Chưa có giao dịch nào.");
+  } else {
+    dv.table(
+      ["Ngày", "Loại", "Tài khoản", "Ghi chú", "Số tiền", "Synced"],
+      txns.map(t => {
+        const d = new Date(t.occurred_at);
+        const dateStr = `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+        const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
+        const typeLabel = isIn
+          ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>'
+          : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
+        return [dateStr, typeLabel, accMap[t.account_id] || '-', t.note || '-', `**${Number(t.amount).toLocaleString()} đ**`, t.synced_at ? '✅' : '⏳'];
+      })
+    );
+  }
+}
+```
+
+---
+
 ## 🤝 Tổng quan Công nợ
 
 ```dataviewjs
@@ -169,7 +220,6 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/debts?person_id=eq.${personId}&
 
 if (res.ok) {
   const rawDebts = await res.json();
-  // Dedup by ID to prevent duplicate display
   const seen = new Set();
   const debts = rawDebts.filter(d => { if (seen.has(d.id)) return false; seen.add(d.id); return true; });
 
@@ -185,15 +235,14 @@ if (res.ok) {
       if (d.status === 'pending') statusStr = "🔴 Pending";
       if (d.status === 'partial') statusStr = "🟠 Partial";
       const dt = new Date(d.occurred_at);
-      const mStr = `${dt.getFullYear()}-\ ${String(dt.getMonth() + 1).padStart(2, '0')}`.replace('- ', '-');
+      const mStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
       return [roleStr, `[[01_Monthly_Logs/${mStr}|${mStr}]]`, d.notes || "-",
         `${Number(d.original_amount).toLocaleString()} đ`,
         `${Number(d.repaid_amount).toLocaleString()} đ`,
         `**${Number(d.remaining_amount).toLocaleString()} đ**`,
         statusStr];
     }));
-  } else {
-    dv.paragraph("Không có công nợ nào với người này. ✅");
   }
+  // If no debts: render nothing (section header remains but no content clutter)
 }
 ```

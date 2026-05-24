@@ -9,7 +9,7 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY || ''
 );
 
-const txnId = '212e9d3e-bc8f-4559-be14-5a8020c35390';
+const txnId = '5f892af4-d007-4fa5-8390-6f6b0299e0e5';
 const webhookUrl = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/JIfwZP5txIaEsyvZ/webhook/supabase-multi-webhook';
 
 async function main() {
