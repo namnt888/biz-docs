@@ -6,6 +6,23 @@ id: 67f1f69a-826c-4348-99b7-fafab0eba37a
 
 [👈 Trở về Debt Center](../00_Dashboard/Debt_Center.md)
 
+<style>
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--border-color, #d1d5db);
+    padding: 8px 10px;
+    vertical-align: middle;
+  }
+  th {
+    background: var(--background-secondary-alt, #2b6cb0);
+    color: var(--text-normal, #fff);
+    font-weight: 700;
+  }
+</style>
+
 ## 📂 Giao dịch theo Năm
 
 - [[Lâm/2026|📅 2026]]

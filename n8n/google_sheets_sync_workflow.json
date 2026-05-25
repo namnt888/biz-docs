@@ -131,7 +131,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const sheets = $json.sheets || [];\nconst targetCycle = $('Dynamic Router (Phân luồng User & Cycle)').item.json.cycle;\nconst templateSheet = sheets.find(s => s.properties.title === 'Template');\nconst targetSheet = sheets.find(s => s.properties.title === targetCycle);\n\nif (!templateSheet) {\n  throw new Error(\"Template sheet not found in the spreadsheet!\");\n}\n\nreturn {\n  json: {\n    sheetExists: !!targetSheet,\n    templateSheetId: templateSheet.properties.sheetId,\n    targetCycle: targetCycle,\n    spreadsheetId: $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId\n  }\n};"
+        "jsCode": "const sheets = $json.sheets || [];\nconst targetCycle = $('Dynamic Router (Phân luồng User & Cycle)').item.json.cycle;\nconst templateSheet = sheets.find(s => s.properties.title === 'Template');\nconst targetSheet = sheets.find(s => s.properties.title === targetCycle);\n\nif (!templateSheet) {\n  throw new Error(\"Template sheet not found in the spreadsheet!\");\n}\n\nreturn {\n  json: {\n    sheetExists: !!targetSheet,\n    templateSheetId: templateSheet.properties.sheetId,\n    targetSheetId: targetSheet ? targetSheet.properties.sheetId : null,\n    targetCycle: targetCycle,\n    spreadsheetId: $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId\n  }\n};"
       },
       "id": "process-sheet-status-code",
       "name": "Process Sheet Status",
@@ -187,7 +187,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const values = $json.values || [];\nconst colA = values[0] || [];\nconst nextRow = Math.max(4, 3 + colA.length);\n\n// Dedup: check if this transaction ID already exists in column A\nconst txnId = $('Prepare Sheet Row (for Auto Map)').item.json.ID;\nif (txnId && colA.includes(txnId)) {\n  throw new Error(`SKIP_DUPLICATE: Transaction ID ${txnId} already exists in sheet. Skipping to prevent duplicate row.`);\n}\n\nconst cycle = $('Dynamic Router (Phân luồng User & Cycle)').item.json.cycle;\nconst spreadsheetId = $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId;\nconst row = $('Prepare Sheet Row (for Auto Map)').item.json;\n\nreturn {\n  json: {\n    spreadsheetId,\n    nextRow,\n    batchPayload: {\n      valueInputOption: 'USER_ENTERED',\n      data: [\n        {\n          range: `'${cycle}'!A${nextRow}:C${nextRow}`,\n          values: [[row.ID, row.Type, row.Date]]\n        },\n        {\n          range: `'${cycle}'!E${nextRow}:H${nextRow}`,\n          values: [[row.Notes, row.Amount, row['% Back'], row['đ Back']]]\n        },\n        {\n          range: `'${cycle}'!K${nextRow}`,\n          values: [[row.ShopSource]]\n        }\n      ]\n    }\n  }\n};"
+        "jsCode": "const values = $json.values || [];\nconst colA = values[0] || [];\nconst nextRow = Math.max(4, 3 + colA.length);\n\n// Dedup: check if this transaction ID already exists in column A\nconst txnId = $('Prepare Sheet Row (for Auto Map)').item.json.ID;\nconst record = $('Dynamic Router (Phân luồng User & Cycle)').item.json.data || {};\nconst metadata = record.metadata || {};\nconst status = (metadata.status || '').toLowerCase();\n\n// If txn exists and status=void -> build deletePayload to remove existing row\nif (txnId && colA.includes(txnId) && status === 'void') {\n  const idx = colA.indexOf(txnId);\n  const rowNumber = 3 + idx;\n  const startIndex = rowNumber - 1;\n  const deleteRequests = [{\n    deleteDimension: {\n      range: {\n        sheetId: $('Process Sheet Status').item.json.targetSheetId,\n        dimension: 'ROWS',\n        startIndex: startIndex,\n        endIndex: startIndex + 1\n      }\n    }\n  }];\n  return { json: { spreadsheetId: $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId, deletePayload: { requests: deleteRequests }, delete: true } };\n}\n\nconst cycle = $('Dynamic Router (Phân luồng User & Cycle)').item.json.cycle;\nconst spreadsheetId = $('Dynamic Router (Phân luồng User & Cycle)').item.json.spreadsheetId;\nconst row = $('Prepare Sheet Row (for Auto Map)').item.json;\n\nreturn {\n  json: {\n    spreadsheetId,\n    nextRow,\n    batchPayload: {\n      valueInputOption: 'USER_ENTERED',\n      data: [\n        {\n          range: `'${cycle}'!A${nextRow}:C${nextRow}`,\n          values: [[row.ID, row.Type, row.Date]]\n        },\n        {\n          range: `'${cycle}'!E${nextRow}:H${nextRow}`,\n          values: [[row.Notes, row.Amount, row['% Back'], row['đ Back']]]\n        },\n        {\n          range: `'${cycle}'!K${nextRow}`,\n          values: [[row.ShopSource]]\n        }\n      ]\n    }\n  }\n};"
       },
       "id": "build-write-payload-code",
       "name": "Build Write Payload",
@@ -217,6 +217,53 @@
       "position": [
         2220,
         180
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qi7b3ugwTvV969Ar",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.delete }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-delete-if",
+      "name": "If Delete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2100,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.spreadsheetId }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.deletePayload) }}",
+        "options": {}
+      },
+      "id": "delete-row-http",
+      "name": "Delete Row (By ID)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        2340,
+        260
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -416,11 +463,34 @@
       "main": [
         [
           {
+            "node": "If Delete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Delete?": {
+      "main": [
+        [
+          {
+            "node": "Delete Row (By ID)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Write Transaction (Preserve Formulas)",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Delete Row (By ID)": {
+      "main": [
+        []
       ]
     }
   },

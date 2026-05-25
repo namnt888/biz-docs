@@ -1,6 +1,6 @@
 /**
  * Google Apps Script to automatically format and sort monthly sheets.
- * Version: 240526
+ * Version: 260524 20:06
  * 
  * INSTRUCTIONS:
  * 1. Open your Google Spreadsheet.
@@ -139,6 +139,10 @@ function reconcileSheetWithSupabase(sheet, spreadsheetId) {
 function formatAndSortSheet(sheet) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 4) return; // No data rows yet (headers are on row 3)
+  const sheetName = sheet.getName();
+  const monthMatch = sheetName.match(/^(\d{4})-(\d{2})$/);
+  const sheetYear = monthMatch ? Number(monthMatch[1]) : null;
+  const sheetMonth = monthMatch ? Number(monthMatch[2]) : null;
 
   // 1. Ensure array formulas exist on Row 3 (Header row) to prevent sorting issues and duplicate collisions
   const d3Range = sheet.getRange("D3");
@@ -160,11 +164,54 @@ function formatAndSortSheet(sheet) {
   const i4Range = sheet.getRange("I4");
   const j4Range = sheet.getRange("J4");
   if (d4Range.getFormula()) d4Range.clearContent();
+
+  // Remove duplicate transaction IDs by keeping the first occurrence only.
+  // This helps recover from repeated restore/sync calls that reinsert the same txn.
+  const idsRange = sheet.getRange(4, 1, lastRow - 3, 1);
+  const ids = idsRange.getValues();
+  const seenIds = new Set();
+  for (let r = ids.length - 1; r >= 0; r--) {
+    const txnId = String(ids[r][0]).trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(txnId);
+    if (!isUuid) continue;
+    if (seenIds.has(txnId)) {
+      sheet.deleteRow(r + 4);
+      continue;
+    }
+    seenIds.add(txnId);
+  }
   if (i4Range.getFormula()) i4Range.clearContent();
   if (j4Range.getFormula()) j4Range.clearContent();
 
-  // 2. Set borders on Columns A to K for all data rows (starting from Row 4)
-  const dataRange = sheet.getRange(4, 1, lastRow - 3, 11); // A4:K[lastRow]
+  // Normalize date cells so sorting follows actual calendar order.
+  const dateRange = sheet.getRange(4, 3, lastRow - 3, 1);
+  const dateValues = dateRange.getValues();
+  let datesChanged = false;
+  if (sheetYear && sheetMonth) {
+    const normalizedDates = dateValues.map(([value]) => {
+      if (value instanceof Date) return [value];
+      const text = String(value || '').trim();
+      const dayMatch = text.match(/^(\d{2})-(\d{2})(?:-(\d{4}))?$/);
+      if (!dayMatch) return [value];
+
+      const day = Number(dayMatch[1]);
+      const month = Number(dayMatch[2]);
+      const year = dayMatch[3] ? Number(dayMatch[3]) : sheetYear;
+      if (!day || !month || !year) return [value];
+
+      const normalized = new Date(year, month - 1, day, 12, 0, 0);
+      datesChanged = true;
+      return [normalized];
+    });
+
+    if (datesChanged) {
+      dateRange.setValues(normalizedDates);
+      dateRange.setNumberFormat('dd-MM');
+    }
+  }
+
+  const newLastRow = sheet.getLastRow();
+  const dataRange = sheet.getRange(4, 1, newLastRow - 3, 11); // A4:K[lastRow]
   dataRange.setBorder(
     true, true, true, true, true, true,
     '#cccccc',

@@ -8,13 +8,13 @@ year: {{date:YYYY}}
 
 [← Trở về trang chính](../{{title}}.md)
 
-## ⚡ Đồng bộ Giao dịch (GSheet Sync)
+## 📜 Giao dịch {{date:YYYY}} (phân theo tháng)
 
 ```dataviewjs
 const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
-const headers = { 
-  'apikey': SUPABASE_ANON_KEY, 
+const headers = {
+  'apikey': SUPABASE_ANON_KEY,
   'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
   'Content-Type': 'application/json',
   'Cache-Control': 'no-cache',
@@ -22,149 +22,10 @@ const headers = {
 };
 
 const personId = dv.current().person_id || dv.current().id;
-
-const container = dv.el("div", "");
-container.style.padding = "15px";
-container.style.border = "1px solid var(--border-color, #cbd5e1)";
-container.style.borderRadius = "8px";
-container.style.backgroundColor = "var(--background-secondary, #f8fafc)";
-container.style.marginBottom = "20px";
-
-const statusText = dv.el("p", "🔄 Đang kiểm tra trạng thái...", { container });
-statusText.style.fontWeight = "bold";
-
-const btnSync = dv.el("button", "🚀 Đồng bộ Giao dịch Chưa Sync", { container });
-btnSync.style.marginRight = "10px";
-btnSync.style.padding = "6px 12px";
-btnSync.style.borderRadius = "4px";
-btnSync.style.cursor = "pointer";
-
-const btnReset = dv.el("button", "⚠️ Reset trạng thái Sync", { container });
-btnReset.style.padding = "6px 12px";
-btnReset.style.borderRadius = "4px";
-btnReset.style.cursor = "pointer";
-btnReset.style.backgroundColor = "rgba(230,57,70,0.1)";
-btnReset.style.color = "#e63946";
-btnReset.style.border = "1px solid #e63946";
-
-async function checkStatus() {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}&synced_at=is.null`, { headers });
-  if (res.ok) {
-    const data = await res.json();
-    statusText.innerText = `📊 Trạng thái: Có ${data.length} giao dịch chưa đồng bộ lên Google Sheet.`;
-    btnSync.disabled = data.length === 0;
-    btnSync.style.opacity = data.length === 0 ? "0.5" : "1";
-  } else {
-    statusText.innerText = "❌ Không thể kết nối Supabase.";
-  }
-}
-
-btnSync.onclick = async () => {
-  btnSync.disabled = true;
-  statusText.innerText = "⏳ Đang gửi yêu cầu đồng bộ...";
-  
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}&synced_at=is.null&select=*,people(sheet_id,name)`, { headers });
-  if (!res.ok) {
-    statusText.innerText = "❌ Lỗi khi tải danh sách giao dịch.";
-    btnSync.disabled = false;
-    return;
-  }
-  
-  const txns = await res.json();
-  if (txns.length === 0) {
-    statusText.innerText = "✅ Không có giao dịch nào cần đồng bộ.";
-    return;
-  }
-  
-  let count = 0;
-  for (const t of txns) {
-    const payload = {
-      table: "transactions",
-      record: {
-        id: t.id,
-        occurred_at: t.occurred_at,
-        type: t.type,
-        type_display: t.type === 'expense' ? 'Out' : 'In',
-        amount: t.amount,
-        cashback_share_percent: t.cashback_share_percent ? Number(t.cashback_share_percent) : null,
-        cashback_share_fixed: t.cashback_share_fixed ? Number(t.cashback_share_fixed) : null,
-        note: t.note,
-        metadata: {
-          ...t.metadata,
-          person_name: t.people?.name,
-          sheet_id: t.people?.sheet_id
-        }
-      }
-    };
-    
-    try {
-      const syncRes = await fetch("http://localhost:5678/webhook/JIfwZP5txIaEsyvZ/webhook/supabase-multi-webhook", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      
-      if (syncRes.ok) {
-        count++;
-        await fetch(`${SUPABASE_URL}/rest/v1/transactions?id=eq.${t.id}`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify({ synced_at: new Date().toISOString() })
-        });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
-  
-  statusText.innerText = `✅ Đã đồng bộ thành công ${count}/${txns.length} giao dịch!`;
-  await checkStatus();
-};
-
-btnReset.onclick = async () => {
-  if (!confirm("Bạn có chắc chắn muốn đặt lại trạng thái đồng bộ? Tất cả giao dịch sẽ được chuyển thành 'Chưa Sync' để có thể đồng bộ lại.")) {
-    return;
-  }
-  
-  statusText.innerText = "⏳ Đang reset...";
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?person_id=eq.${personId}`, {
-    method: "PATCH",
-    headers,
-    body: JSON.stringify({ synced_at: null })
-  });
-  
-  if (res.ok) {
-    statusText.innerText = "✅ Đã reset trạng thái đồng bộ thành công!";
-    await checkStatus();
-  } else {
-    statusText.innerText = "❌ Không thể reset trạng thái.";
-  }
-};
-
-checkStatus();
-```
-
----
-
-## 📜 Giao dịch {{date:YYYY}} (phân theo tháng)
-
-```dataviewjs
-const SUPABASE_URL = "https://fyrgmsfsqzofqduiidrj.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5cmdtc2ZzcXpvZnFkdWlpZHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTcxNDQsImV4cCI6MjA5NDUzMzE0NH0.V15TiTEf0JYYgi42enkGbTNHV0XpHPLPmw3F23G4Bwc";
-const headers = { 
-  'apikey': SUPABASE_ANON_KEY, 
-  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-  'Content-Type': 'application/json',
-  'Cache-Control': 'no-cache',
-  'Pragma': 'no-cache'
-};
-
-const personId = dv.current().person_id;
 const year = dv.current().year;
 const startDate = `${year}-01-01T00:00:00Z`;
 const endDate = `${year}-12-31T23:59:59Z`;
 
-// Fetch accounts mapping in parallel
 const accRes = await fetch(`${SUPABASE_URL}/rest/v1/accounts`, { headers });
 const accounts = accRes.ok ? await accRes.json() : [];
 const accMap = {};
@@ -175,12 +36,13 @@ const res = await fetch(
   { headers }
 );
 
-if (res.ok) {
+if (!res.ok) {
+  dv.paragraph("❌ Không thể tải giao dịch từ Supabase.");
+} else {
   const txns = await res.json();
   if (txns.length === 0) {
     dv.paragraph("Không có giao dịch nào trong năm này.");
   } else {
-    // Group by month
     const byMonth = {};
     txns.forEach(t => {
       const d = new Date(t.occurred_at);
@@ -189,10 +51,16 @@ if (res.ok) {
       byMonth[mStr].push(t);
     });
 
+    const formatAmount = value => Number(value || 0).toLocaleString('vi-VN');
+    const statusStyles = {
+      posted: { bg: 'rgba(46,200,102,0.15)', color: '#2ec866' },
+      pending: { bg: 'rgba(244,208,63,0.12)', color: '#f4d03f' },
+      void: { bg: 'rgba(120,120,120,0.08)', color: '#6b7280' }
+    };
+
     const months = Object.keys(byMonth).sort().reverse();
     for (const month of months) {
       const monthTxns = byMonth[month];
-      
       const expenses = monthTxns.filter(t => !['income','repayment','refund','transfer_in'].includes(t.type));
       const repayments = monthTxns.filter(t => ['income','repayment','refund','transfer_in'].includes(t.type));
 
@@ -206,98 +74,83 @@ if (res.ok) {
       const netExpense = totalOut - totalCB;
       const remains = netExpense - totalIn;
 
-      const badgeStyle = "display:inline-block; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 5px;";
-      
-      let headerHTML = `📅 [[01_Monthly_Logs/${month}|${month}]] — ${monthTxns.length} txn | `;
-      headerHTML += `Out: <span style="${badgeStyle} background-color: rgba(242,95,92,0.15); color: #f25f5c;">${totalOut.toLocaleString()}</span> | `;
-      headerHTML += `CB: <span style="${badgeStyle} background-color: rgba(46,200,102,0.15); color: #2ec866;">-${totalCB.toLocaleString()}</span> | `;
-      headerHTML += `Net: <span style="${badgeStyle} background-color: rgba(233,196,106,0.15); color: #e9c46a;">${netExpense.toLocaleString()}</span> | `;
-      headerHTML += `Repay: <span style="${badgeStyle} background-color: rgba(69,123,157,0.15); color: #457b9d;">${totalIn.toLocaleString()}</span> | `;
-      headerHTML += `Remains: <span style="${badgeStyle} background-color: ${remains > 0 ? 'rgba(230,57,70,0.15)' : 'rgba(46,200,102,0.15)'}; color: ${remains > 0 ? '#e63946' : '#2ec866'};">${remains.toLocaleString()}</span>`;
+      dv.paragraph(`📅 [[01_Monthly_Logs/${month}|${month}]]`);
 
-      dv.header(3, headerHTML);
+      const section = dv.el("div", "");
+      section.style.margin = "18px 0 10px";
+      section.style.padding = "12px 14px";
+      section.style.borderRadius = "10px";
+      section.style.borderLeft = `5px solid ${remains > 0 ? '#e63946' : '#2ec866'}`;
+      section.style.background = "var(--background-secondary, rgba(255,255,255,0.03))";
+
+      section.innerHTML = `
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-weight:700;line-height:1.4;">
+          <span style="opacity:0.75;">${monthTxns.length} txn</span>
+          <span style="padding:2px 8px;border-radius:999px;background:rgba(242,95,92,0.15);color:#f25f5c;">Out ${formatAmount(totalOut)}</span>
+          <span style="padding:2px 8px;border-radius:999px;background:rgba(46,200,102,0.15);color:#2ec866;">CB ${formatAmount(totalCB)}</span>
+          <span style="padding:2px 8px;border-radius:999px;background:rgba(233,196,106,0.15);color:#e9c46a;">Net ${formatAmount(netExpense)}</span>
+          <span style="padding:2px 8px;border-radius:999px;background:rgba(69,123,157,0.15);color:#457b9d;">Repay ${formatAmount(totalIn)}</span>
+          <span style="padding:2px 8px;border-radius:999px;background:${remains > 0 ? 'rgba(230,57,70,0.15)' : 'rgba(46,200,102,0.15)'};color:${remains > 0 ? '#e63946' : '#2ec866'};">Remain ${formatAmount(remains)}</span>
+        </div>
+      `;
 
       dv.table(
-        ["ID", "Loại", "Tài khoản", "Ngày", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
+        ["ID", "Type", "Status", "Date", "Shop", "Notes", "Amount", "% Back", "đ Back", "Σ Back", "Final Price", "Flow", "Account"],
         monthTxns.map(t => {
-          const d = new Date(t.occurred_at);
-          const shortId = t.id ? t.id.substring(0, 5) : '-';
-          const idCell = t.id ? `<span title="Click to copy full ID: ${t.id}" style="cursor:pointer;font-family:monospace;text-decoration:underline;" onclick="navigator.clipboard.writeText('${t.id}'); if (typeof Notice !== 'undefined') new Notice('Copied ID: ${t.id}'); else alert('Copied!');">${shortId} 📋</span>` : '-';
-          
-          const amt = Number(t.amount);
-          const cbPct = Number(t.cashback_share_percent || 0);
-          const cbFixed = Number(t.cashback_share_fixed || 0);
-          const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
+          const amount = Number(t.amount);
+          const cashbackPercent = Number(t.cashback_share_percent || 0);
+          const cashbackFixed = Number(t.cashback_share_fixed || 0);
+          const cashbackTotal = cashbackPercent > 0 ? Math.round(amount * cashbackPercent) : cashbackFixed;
           const fee = Number(t.metadata?.service_fee || 0);
-          const net = amt - cbSum + fee;
-          
+          const finalPrice = amount - cashbackTotal + fee;
+          const status = (t.status || 'posted').toLowerCase();
+          const shopName = t.metadata?.shop_source || t.shop_source || '-';
+          const accountName = accMap[t.account_id] || '-';
+          const accountLink = accountName !== '-' ? `[[02_Accounts/${accountName}|${accountName}]]` : '-';
           const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
-          const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
-          
-          const accName = accMap[t.account_id] || '-';
-          const accountLink = accName !== '-' ? `[[02_Accounts/${accName}|${accName}]]` : '-';
+          const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:700;">In</span>' : '<span style="color:#f25f5c;font-weight:700;">Out</span>';
+          const flowIcon = isIn ? '🟢' : '🔴';
+          const sc = statusStyles[status] || statusStyles.posted;
+          const statusBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${sc.bg};color:${sc.color};font-weight:700;">${status}</span>`;
+          const strikeStart = status === 'void' ? '<span style="text-decoration:line-through;opacity:0.6;">' : '';
+          const strikeEnd = status === 'void' ? '</span>' : '';
 
           return [
-            idCell,
+            `\`${(t.id || '-').substring(0, 5)}\``,
             typeLabel,
-            accountLink,
-            d.toLocaleDateString('vi-VN'),
-            `**${amt.toLocaleString()}**`,
-            cbPct > 0 ? `${(cbPct * 100).toFixed(0)}%` : '-',
-            cbFixed > 0 ? `${cbFixed.toLocaleString()}` : '-',
-            cbSum > 0 ? `${cbSum.toLocaleString()}` : '-',
-            `**${net.toLocaleString()}**`,
-            t.note || "-"
+            statusBadge,
+            new Date(t.occurred_at).toLocaleDateString('vi-VN'),
+            shopName,
+            `${strikeStart}${t.note || "-"}${strikeEnd}`,
+            `${strikeStart}**${formatAmount(amount)}**${strikeEnd}`,
+            cashbackPercent > 0 ? `${(cashbackPercent * 100).toFixed(1)}%` : '-',
+            cashbackFixed > 0 ? `${formatAmount(cashbackFixed)}` : '-',
+            cashbackTotal > 0 ? `${formatAmount(cashbackTotal)}` : '-',
+            `${strikeStart}**${formatAmount(finalPrice)}**${strikeEnd}`,
+            flowIcon,
+            accountLink
           ];
         })
       );
-    }
 
-    // Wait a tiny bit for the table to render in DOM and add sorting + borders
-    setTimeout(() => {
-      const containerEl = dv.container;
-      const tables = containerEl.querySelectorAll('table');
-      tables.forEach(table => {
+      setTimeout(() => {
+        const tables = dv.container.querySelectorAll('table');
+        const table = tables[tables.length - 1];
+        if (!table) return;
         table.style.borderCollapse = 'collapse';
         table.style.width = '100%';
-        
-        const headers = table.querySelectorAll('th');
-        headers.forEach((th, index) => {
-          th.style.cursor = 'pointer';
-          th.style.border = '1px solid var(--border-color, #cbd5e1)';
-          th.style.backgroundColor = 'var(--background-secondary-alt, #2b6cb0)';
-          th.style.color = 'var(--text-normal, #ffffff)';
-          th.style.padding = '8px';
-          th.setAttribute('title', 'Click to sort');
-          th.addEventListener('click', () => {
-            const rows = Array.from(table.querySelectorAll('tbody tr'));
-            const isAsc = th.getAttribute('data-order') === 'asc';
-            rows.sort((rowA, rowB) => {
-              const cellA = rowA.children[index].textContent.trim();
-              const cellB = rowB.children[index].textContent.trim();
-              
-              // Numeric sort
-              const numA = parseFloat(cellA.replace(/[^0-9.-]/g, ''));
-              const numB = parseFloat(cellB.replace(/[^0-9.-]/g, ''));
-              if (!isNaN(numA) && !isNaN(numB)) {
-                return isAsc ? numA - numB : numB - numA;
-              }
-              return isAsc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
-            });
-            th.setAttribute('data-order', isAsc ? 'desc' : 'asc');
-            const tbody = table.querySelector('tbody');
-            tbody.innerHTML = '';
-            rows.forEach(row => tbody.appendChild(row));
-          });
+        table.querySelectorAll('th, td').forEach(cell => {
+          cell.style.border = '1px solid var(--border-color, #d1d5db)';
+          cell.style.padding = '7px 9px';
+          cell.style.verticalAlign = 'middle';
         });
-        
-        const cells = table.querySelectorAll('td');
-        cells.forEach(td => {
-          td.style.border = '1px solid var(--border-color, #e2e8f0)';
-          td.style.padding = '8px';
+        table.querySelectorAll('th').forEach(th => {
+          th.style.background = 'var(--background-secondary-alt, #2b6cb0)';
+          th.style.color = 'var(--text-normal, #fff)';
+          th.style.fontWeight = '700';
         });
-      });
-    }, 200);
+      }, 50);
+    }
   }
 }
 ```

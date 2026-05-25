@@ -46,6 +46,20 @@
   .expense-card { border-left: 5px solid #f25f5c; }
   .savings-card { border-left: 5px solid #4895ef; }
   .rate-card { border-left: 5px solid #f7b2bd; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--border-color, #d1d5db);
+    padding: 8px 10px;
+    vertical-align: middle;
+  }
+  th {
+    background: var(--background-secondary-alt, #2b6cb0);
+    color: var(--text-normal, #fff);
+    font-weight: 700;
+  }
 </style>
 
 ## 📊 Chỉ số Tài chính Tháng này (Thực tế)
@@ -164,6 +178,11 @@ try {
     const txns = await txnRes.json();
     const accounts = await accRes.json();
     const accMap = Object.fromEntries(accounts.map(a => [a.id, a.name]));
+    const statusStyles = {
+      posted: { bg: 'rgba(46,200,102,0.15)', color: '#2ec866' },
+      pending: { bg: 'rgba(244,208,63,0.12)', color: '#f4d03f' },
+      void: { bg: 'rgba(120,120,120,0.08)', color: '#6b7280' }
+    };
 
     const internalTxns = txns.filter(t => {
       const isDebtRelated = t.person_id !== null || ['debt', 'repayment'].includes(t.type);
@@ -175,7 +194,7 @@ try {
       dv.paragraph("Không có giao dịch cá nhân thực tế nào trong tháng này.");
     } else {
       dv.table(
-        ["ID", "Loại", "Ngày", "Tài khoản", "Số tiền", "% CB", "Final Price", "Ghi chú", "Danh mục"],
+        ["ID", "Status", "Loại", "Ngày", "Tài khoản", "Số tiền", "% CB", "Final Price", "Ghi chú", "Danh mục"],
         internalTxns.map(t => {
           const d = new Date(t.occurred_at);
           const shortId = t.id ? t.id.substring(0, 5) : '-';
@@ -187,17 +206,23 @@ try {
           const net = amt - cbSum + fee;
           const isIn = ['income','cashback','refund'].includes(t.type);
           const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
+          const status = (t.status || 'posted').toLowerCase();
+          const sc = statusStyles[status] || statusStyles.posted;
+          const statusBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${sc.bg};color:${sc.color};font-weight:700;">${status.toUpperCase()}</span>`;
+          const strikeStart = status === 'void' ? '<span style="text-decoration:line-through;opacity:0.6;">' : '';
+          const strikeEnd = status === 'void' ? '</span>' : '';
           const accLink = accMap[t.account_id] ? `[[${accMap[t.account_id]}]]` : '-';
 
           return [
             `\`${shortId}\``,
+            statusBadge,
             typeLabel,
             d.toLocaleDateString('vi-VN'),
             accLink,
-            `**${amt.toLocaleString()} đ**`,
+            `${strikeStart}**${amt.toLocaleString()} đ**${strikeEnd}`,
             cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
-            `**${net.toLocaleString()} đ**`,
-            t.note || "-",
+            `${strikeStart}**${net.toLocaleString()} đ**${strikeEnd}`,
+            `${strikeStart}${t.note || "-"}${strikeEnd}`,
             t.metadata?.category_name || "Khác"
           ];
         })
@@ -242,6 +267,11 @@ try {
     
     const peopleMap = Object.fromEntries(people.map(p => [p.id, p.name]));
     const accMap = Object.fromEntries(accounts.map(a => [a.id, a.name]));
+    const statusStyles = {
+      posted: { bg: 'rgba(46,200,102,0.15)', color: '#2ec866' },
+      pending: { bg: 'rgba(244,208,63,0.12)', color: '#f4d03f' },
+      void: { bg: 'rgba(120,120,120,0.08)', color: '#6b7280' }
+    };
 
     const externalTxns = txns.filter(t => {
       const isDebtRelated = t.person_id !== null || ['debt', 'repayment'].includes(t.type);
@@ -253,7 +283,7 @@ try {
       dv.paragraph("Không có giao dịch nợ nần hay chuyển khoản nào trong tháng này.");
     } else {
       dv.table(
-        ["ID", "Phân loại", "Ngày", "Đối tác/Ví", "Tài khoản", "Số tiền", "Ghi chú"],
+        ["ID", "Status", "Phân loại", "Ngày", "Đối tác/Ví", "Tài khoản", "Số tiền", "Ghi chú"],
         externalTxns.map(t => {
           const d = new Date(t.occurred_at);
           const shortId = t.id ? t.id.substring(0, 5) : '-';
@@ -267,17 +297,23 @@ try {
           else if (t.type === 'transfer_out') { subType = "Chuyển gửi"; labelColor = "#f72585"; }
           
           const typeLabel = `<span style="color:${labelColor};font-weight:bold;">${subType}</span>`;
+          const status = (t.status || 'posted').toLowerCase();
+          const sc = statusStyles[status] || statusStyles.posted;
+          const statusBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${sc.bg};color:${sc.color};font-weight:700;">${status.toUpperCase()}</span>`;
+          const strikeStart = status === 'void' ? '<span style="text-decoration:line-through;opacity:0.6;">' : '';
+          const strikeEnd = status === 'void' ? '</span>' : '';
           const partnerLink = peopleMap[t.person_id] ? `[[${peopleMap[t.person_id]}]]` : '-';
           const accLink = accMap[t.account_id] ? `[[${accMap[t.account_id]}]]` : '-';
 
           return [
             `\`${shortId}\``,
+            statusBadge,
             typeLabel,
             d.toLocaleDateString('vi-VN'),
             partnerLink,
             accLink,
-            `**${amt.toLocaleString()} đ**`,
-            t.note || "-"
+            `${strikeStart}**${amt.toLocaleString()} đ**${strikeEnd}`,
+            `${strikeStart}${t.note || "-"}${strikeEnd}`
           ];
         })
       );

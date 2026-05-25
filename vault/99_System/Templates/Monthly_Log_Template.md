@@ -9,6 +9,23 @@ month: "{{title}}"
 
 [👈 Xem Dashboard](../00_Dashboard/Dashboard.md)  |  [👤 Báo cáo của tôi](../00_Dashboard/My_Report.md)  |  [💸 Phân tích Thu Chi](../00_Dashboard/Cashflow_Analytics.md)
 
+<style>
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--border-color, #d1d5db);
+    padding: 8px 10px;
+    vertical-align: middle;
+  }
+  th {
+    background: var(--background-secondary-alt, #2b6cb0);
+    color: var(--text-normal, #fff);
+    font-weight: 700;
+  }
+</style>
+
 ---
 
 ## 📥 Unsynced Transactions
@@ -40,10 +57,15 @@ if (txnRes.ok && peopleRes.ok && accRes.ok) {
   const accounts = await accRes.json();
   const peopleMap = Object.fromEntries(people.map(p => [p.id, p.name]));
   const accMap = Object.fromEntries(accounts.map(a => [a.id, a.name]));
+  const statusStyles = {
+    posted: { bg: 'rgba(46,200,102,0.15)', color: '#2ec866' },
+    pending: { bg: 'rgba(244,208,63,0.12)', color: '#f4d03f' },
+    void: { bg: 'rgba(120,120,120,0.08)', color: '#6b7280' }
+  };
 
   if (txns.length > 0) {
     dv.table(
-      ["ID", "Ngày GD", "Thời gian Thêm", "Người", "Tài khoản", "Loại", "Số tiền", "% CB", "Final Price", "Ghi chú"],
+      ["ID", "Status", "Ngày GD", "Thời gian Thêm", "Người", "Tài khoản", "Loại", "Số tiền", "% CB", "Final Price", "Ghi chú"],
       txns.map(t => {
         const d = new Date(t.occurred_at);
         const c = new Date(t.created_at);
@@ -56,20 +78,26 @@ if (txnRes.ok && peopleRes.ok && accRes.ok) {
         const net = amt - cbSum + fee;
         const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
         const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
+        const status = (t.status || 'posted').toLowerCase();
+        const sc = statusStyles[status] || statusStyles.posted;
+        const statusBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${sc.bg};color:${sc.color};font-weight:700;">${status.toUpperCase()}</span>`;
+        const strikeStart = status === 'void' ? '<span style="text-decoration:line-through;opacity:0.6;">' : '';
+        const strikeEnd = status === 'void' ? '</span>' : '';
         const pLink = peopleMap[t.person_id] ? `[[${peopleMap[t.person_id]}]]` : '-';
         const accLink = accMap[t.account_id] ? `[[${accMap[t.account_id]}]]` : '-';
 
         return [
           `\`${shortId}\``,
+          statusBadge,
           d.toLocaleDateString('vi-VN'),
           c.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
           pLink,
           accLink,
           typeLabel,
-          `**${amt.toLocaleString()}**`,
+          `${strikeStart}**${amt.toLocaleString()}**${strikeEnd}`,
           cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
-          `**${net.toLocaleString()}**`,
-          t.note || "-"
+          `${strikeStart}**${net.toLocaleString()}**${strikeEnd}`,
+          `${strikeStart}${t.note || "-"}${strikeEnd}`
         ];
       })
     );
@@ -152,6 +180,11 @@ if (!month) {
 
     const peopleMap = Object.fromEntries(people.map(p => [p.id, p.name]));
     const accMap = Object.fromEntries(accounts.map(a => [a.id, a.name]));
+      const statusStyles = {
+        posted: { bg: 'rgba(46,200,102,0.15)', color: '#2ec866' },
+        pending: { bg: 'rgba(244,208,63,0.12)', color: '#f4d03f' },
+        void: { bg: 'rgba(120,120,120,0.08)', color: '#6b7280' }
+      };
 
     if (txns.length === 0) {
       dv.paragraph("Chưa có giao dịch nào được đồng bộ trong tháng này.");
@@ -195,7 +228,7 @@ if (!month) {
             `\`${shortId}\``,
             d.toLocaleDateString('vi-VN'),
             pLink,
-            accLink,
+        ["ID", "Status", "Ngày", "Người", "Tài khoản", "Loại", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
             typeLabel,
             `**${amt.toLocaleString()}**`,
             cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
@@ -207,21 +240,27 @@ if (!month) {
         })
       );
 
+          const status = (t.status || 'posted').toLowerCase();
+          const sc = statusStyles[status] || statusStyles.posted;
+          const statusBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${sc.bg};color:${sc.color};font-weight:700;">${status.toUpperCase()}</span>`;
+          const strikeStart = status === 'void' ? '<span style="text-decoration:line-through;opacity:0.6;">' : '';
+          const strikeEnd = status === 'void' ? '</span>' : '';
       // Apply styled headers & borders
       setTimeout(() => {
         const containerEl = dv.container;
         const tables = containerEl.querySelectorAll('table');
         tables.forEach(table => {
+            statusBadge,
           table.style.borderCollapse = 'collapse';
           table.style.width = '100%';
           table.querySelectorAll('th').forEach(th => {
             th.style.border = '1px solid var(--border-color, #cbd5e1)';
-            th.style.backgroundColor = 'var(--background-secondary-alt, #2b6cb0)';
+            `${strikeStart}**${amt.toLocaleString()}**${strikeEnd}`,
             th.style.color = 'var(--text-normal, #ffffff)';
             th.style.padding = '8px';
-          });
-          table.querySelectorAll('td').forEach(td => {
-            td.style.border = '1px solid var(--border-color, #e2e8f0)';
+            cbSum > 0 ? `${cbSum.toLocaleString()}` : '-',
+            `${strikeStart}**${net.toLocaleString()}**${strikeEnd}`,
+            `${strikeStart}${t.note || "-"}${strikeEnd}`
             td.style.padding = '8px';
           });
         });

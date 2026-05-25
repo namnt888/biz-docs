@@ -6,6 +6,23 @@ id: 5a6d5ff2-a221-4ce5-b367-c633e29d5390
 
 [👈 Trở về Debt Center](../00_Dashboard/Debt_Center.md)
 
+<style>
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--border-color, #d1d5db);
+    padding: 8px 10px;
+    vertical-align: middle;
+  }
+  th {
+    background: var(--background-secondary-alt, #2b6cb0);
+    color: var(--text-normal, #fff);
+    font-weight: 700;
+  }
+</style>
+
 ## 📂 Giao dịch theo Năm
 
 - [[Tuấn/2026|📅 2026]]

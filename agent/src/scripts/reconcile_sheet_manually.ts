@@ -77,7 +77,7 @@ async function main() {
 
   const { data: txns, error } = await supabase
     .from('transactions')
-    .select('id, metadata')
+    .select('id, metadata, status')
     .eq('person_id', personId);
 
   if (error) {
@@ -85,8 +85,10 @@ async function main() {
     process.exit(1);
   }
 
+  // Exclude transactions marked as 'void' so they are not considered active rows
   const activeIds = new Set<string>();
   (txns || []).forEach(t => {
+    if (t.status === 'void') return;
     const meta = t.metadata as any || {};
     const c = meta.cycle_tag || meta.debt_cycle_tag || meta.statement_cycle_tag;
     if (c === cycle) {

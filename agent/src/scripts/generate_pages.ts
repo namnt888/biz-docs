@@ -30,6 +30,23 @@ id: ${acc.id}
 
 [👈 Trở về Dashboard](../00_Dashboard/Dashboard.md)
 
+<style>
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--border-color, #d1d5db);
+    padding: 8px 10px;
+    vertical-align: middle;
+  }
+  th {
+    background: var(--background-secondary-alt, #2b6cb0);
+    color: var(--text-normal, #fff);
+    font-weight: 700;
+  }
+</style>
+
 ## 📊 Thống kê Tài khoản
 
 \`\`\`dataviewjs
@@ -107,11 +124,22 @@ const res = await fetch(\`\${SUPABASE_URL}/rest/v1/transactions?account_id=eq.\$
 
 if (res.ok) {
   const txns = await res.json();
-  dv.table(["ID", "Loại", "Kỳ", "Ngày", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
+  const statusStyles = {
+    posted: { bg: 'rgba(46,200,102,0.15)', color: '#2ec866' },
+    pending: { bg: 'rgba(244,208,63,0.12)', color: '#f4d03f' },
+    void: { bg: 'rgba(120,120,120,0.08)', color: '#6b7280' }
+  };
+
+  dv.table(["ID", "Status", "Loại", "Kỳ", "Ngày", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
     const typeLabel = isPlus ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
+    const status = (t.status || 'posted').toLowerCase();
+    const sc = statusStyles[status] || statusStyles.posted;
+    const statusBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:' + sc.bg + ';color:' + sc.color + ';font-weight:700;">' + status.toUpperCase() + '</span>';
+    const strikeStart = status === 'void' ? '<span style="text-decoration:line-through;opacity:0.6;">' : '';
+    const strikeEnd = status === 'void' ? '</span>' : '';
     const d = new Date(t.occurred_at);
-    const mStr = \`\${d.getFullYear()}-\\ \${String(d.getMonth() + 1).padStart(2, '0')}\`.replace('- ', '-');
+    const mStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     const shortId = t.id ? t.id.substring(0, 5) : '-';
     const amt = Number(t.amount);
     const cbPct = Number(t.cashback_share_percent || 0);
@@ -120,16 +148,17 @@ if (res.ok) {
     const fee = Number(t.metadata?.service_fee || 0);
     const net = amt - cbSum + fee;
     return [
-      \`\\\`\${shortId}\\\`\`,
+      shortId,
+      statusBadge,
       typeLabel,
-      \`[[01_Monthly_Logs/\${mStr}|\${mStr}]]\`,
+      '[[' + '01_Monthly_Logs/' + mStr + '|' + mStr + ']]',
       d.toLocaleDateString('vi-VN'),
-      \`**\${amt.toLocaleString()} đ**\`,
-      cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
-      cbFixed > 0 ? \`\${cbFixed.toLocaleString()} đ\` : '-',
-      cbSum > 0 ? \`\${cbSum.toLocaleString()} đ\` : '-',
-      \`**\${net.toLocaleString()} đ**\`,
-      t.note || "-"
+      strikeStart + '**' + amt.toLocaleString() + ' đ**' + strikeEnd,
+      cbPct > 0 ? (cbPct * 100).toFixed(1) + '%' : '-',
+      cbFixed > 0 ? cbFixed.toLocaleString() + ' đ' : '-',
+      cbSum > 0 ? cbSum.toLocaleString() + ' đ' : '-',
+      strikeStart + '**' + net.toLocaleString() + ' đ**' + strikeEnd,
+      strikeStart + (t.note || '-') + strikeEnd
     ];
   }));
 }
@@ -149,6 +178,23 @@ id: ${p.id}
 # 👤 ${p.name}
 
 [👈 Trở về Debt Center](../00_Dashboard/Debt_Center.md)
+
+<style>
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--border-color, #d1d5db);
+    padding: 8px 10px;
+    vertical-align: middle;
+  }
+  th {
+    background: var(--background-secondary-alt, #2b6cb0);
+    color: var(--text-normal, #fff);
+    font-weight: 700;
+  }
+</style>
 
 ## 📂 Giao dịch theo Năm
 
@@ -203,93 +249,15 @@ if (res.ok) {
 // PEOPLE YEAR PAGE (one page per year with transactions)
 // ──────────────────────────────────────────────
 function peopleYearPage(p: { id: string; name: string }, year: number) {
-  return `---
-type: person_year
-person_id: ${p.id}
-person_name: ${p.name}
-year: ${year}
----
-# 👤 [[${p.name}]] — ${year}
-
-[← Trở về trang chính](../${p.name}.md)
-
-## 📜 Giao dịch ${year} (phân theo tháng)
-
-\`\`\`dataviewjs
-const SUPABASE_URL = "${SUPABASE_URL}";
-const SUPABASE_ANON_KEY = "${SUPABASE_ANON_KEY}";
-const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': \`Bearer \${SUPABASE_ANON_KEY}\` };
-
-const personId = dv.current().person_id;
-const year = dv.current().year;
-const startDate = \`\${year}-01-01T00:00:00Z\`;
-const endDate = \`\${year}-12-31T23:59:59Z\`;
-
-const res = await fetch(
-  \`\${SUPABASE_URL}/rest/v1/transactions?person_id=eq.\${personId}&occurred_at=gte.\${startDate}&occurred_at=lte.\${endDate}&order=occurred_at.desc\`,
-  { headers }
-);
-
-if (res.ok) {
-  const txns = await res.json();
-  if (txns.length === 0) {
-    dv.paragraph("Không có giao dịch nào trong năm này.");
-  } else {
-    // Group by month
-    const byMonth = {};
-    txns.forEach(t => {
-      const d = new Date(t.occurred_at);
-      const mStr = \`\${d.getFullYear()}-\${String(d.getMonth() + 1).padStart(2, '0')}\`;
-      if (!byMonth[mStr]) byMonth[mStr] = [];
-      byMonth[mStr].push(t);
-    });
-
-    const months = Object.keys(byMonth).sort().reverse();
-    for (const month of months) {
-      const monthTxns = byMonth[month];
-      const totalAmt = monthTxns.reduce((s, t) => s + Number(t.amount), 0);
-      const totalCB = monthTxns.reduce((s, t) => {
-        const amt = Number(t.amount);
-        const cb = t.cashback_share_percent ? Math.round(amt * t.cashback_share_percent) : Number(t.cashback_share_fixed || 0);
-        return s + cb;
-      }, 0);
-      const totalNet = totalAmt - totalCB;
-
-      dv.header(3, \`📅 [[01_Monthly_Logs/\${month}|\${month}]] — \${monthTxns.length} txn | 💰 \${totalAmt.toLocaleString()} đ | 🎁 CB: \${totalCB.toLocaleString()} đ | Net: \${totalNet.toLocaleString()} đ\`);
-
-      dv.table(
-        ["ID", "Loại", "Ngày", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"],
-        monthTxns.map(t => {
-          const d = new Date(t.occurred_at);
-          const shortId = t.id ? t.id.substring(0, 5) : '-';
-          const amt = Number(t.amount);
-          const cbPct = Number(t.cashback_share_percent || 0);
-          const cbFixed = Number(t.cashback_share_fixed || 0);
-          const cbSum = cbPct > 0 ? Math.round(amt * cbPct) : cbFixed;
-          const fee = Number(t.metadata?.service_fee || 0);
-          const net = amt - cbSum + fee;
-          const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
-          const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
-          return [
-            \`\\\`\${shortId}\\\`\`,
-            typeLabel,
-            d.toLocaleDateString('vi-VN'),
-            \`**\${amt.toLocaleString()} đ**\`,
-            cbPct > 0 ? \`\${(cbPct * 100).toFixed(1)}%\` : '-',
-            cbFixed > 0 ? \`\${cbFixed.toLocaleString()} đ\` : '-',
-            cbSum > 0 ? \`\${cbSum.toLocaleString()} đ\` : '-',
-            \`**\${net.toLocaleString()} đ**\`,
-            t.note || "-"
-          ];
-        })
-      );
-    }
-  }
+  const templatePath = path.join(vaultPath, '99_System', 'Templates', 'People_Year_Template.md');
+  const template = fs.readFileSync(templatePath, 'utf8');
+  return template
+    .replace(/\{\{title\}\}/g, p.name)
+    .replace(/\{\{date:YYYY\}\}/g, String(year))
+    .replace('person_id: ""', `person_id: ${p.id}`)
+    .replace('person_name: "{{title}}"', `person_name: ${p.name}`)
+    .replace('year: {{date:YYYY}}', `year: ${year}`);
 }
-\`\`\`
-`;
-}
-
 async function generate() {
   console.log('Fetching Accounts and People from Supabase...');
   const [accRes, pplRes] = await Promise.all([

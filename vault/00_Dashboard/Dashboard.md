@@ -2,6 +2,23 @@
 
 > Hệ thống điều hành tài chính cá nhân tự động hóa. Dữ liệu đồng bộ realtime từ Supabase.
 
+<style>
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--border-color, #d1d5db);
+    padding: 8px 10px;
+    vertical-align: middle;
+  }
+  th {
+    background: var(--background-secondary-alt, #2b6cb0);
+    color: var(--text-normal, #fff);
+    font-weight: 700;
+  }
+</style>
+
 | 👤 [Báo cáo của tôi](My_Report.md) | 💸 [Phân tích Thu Chi](Cashflow_Analytics.md) | 🤝 [Trung tâm Công nợ](Debt_Center.md) | 🎁 [Quản lý Hoàn tiền](Cashback_Center.md) |
 | :---: | :---: | :---: | :---: |
 

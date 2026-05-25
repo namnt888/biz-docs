@@ -131,8 +131,157 @@ function parseCustomInput(text: string): ParsedTx[] {
   return txs;
 }
 
+async function markTransactionStatus(txId: string, status: string) {
+  console.log(`Setting transaction ${txId} status='${status}'...`);
+  const { data, error } = await supabase
+    .from('transactions')
+    .update({ status: status })
+    .eq('id', txId)
+    .select('id, status, occurred_at, metadata, people(id, name, sheet_id)')
+    .single();
+
+  if (error) {
+    console.error('❌ Failed to update status:', error.message);
+    process.exit(1);
+  }
+
+  console.log(`✅ Transaction ${txId} updated to status='${status}'`);
+
+  if (status === 'void') {
+    try {
+      const webhookUrl = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/supabase-multi-webhook';
+      const { data: txn, error: txnErr } = await supabase
+        .from('transactions')
+        .select('id, occurred_at, type, amount, cashback_share_percent, cashback_share_fixed, note, metadata, people(id, name, sheet_id)')
+        .eq('id', txId)
+        .single();
+
+      if (txnErr) {
+        console.error('❌ Failed to fetch voided transaction for webhook sync:', txnErr.message);
+        return;
+      }
+
+      const personRecord = Array.isArray(txn?.people) ? txn.people[0] : txn?.people;
+      const payload = {
+        table: 'transactions',
+        record: {
+          id: txn.id,
+          occurred_at: txn.occurred_at,
+          type: txn.type,
+          type_display: txn.type === 'expense' ? 'Out' : 'In',
+          amount: txn.amount,
+          cashback_share_percent: txn.cashback_share_percent,
+          cashback_share_fixed: txn.cashback_share_fixed,
+          note: txn.note,
+          metadata: {
+            ...(txn.metadata || {}),
+            person_name: personRecord?.name || txn.metadata?.person_name || '',
+            sheet_id: personRecord?.sheet_id || txn.metadata?.sheet_id || '',
+            status: 'void'
+          }
+        }
+      };
+
+      console.log(`Triggering n8n delete sync for ${personRecord?.name || 'unknown person'}: ${webhookUrl}`);
+      const resp = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (resp.ok) {
+        console.log('✅ n8n void sync triggered');
+      } else {
+        console.error(`❌ n8n void sync failed: ${resp.status}`);
+      }
+    } catch (e: any) {
+      console.error('❌ Error sending void webhook:', e.message || e);
+    }
+  }
+
+  const personRecord = Array.isArray(data?.people) ? data.people[0] : data?.people;
+  const personName = personRecord?.name || data?.metadata?.person_name || '';
+  const deployKey = personName
+    ? `PEOPLE_SHEET_DEPLOY_${personName
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .toUpperCase()}`
+    : '';
+  const deployId = deployKey ? process.env[deployKey] : '';
+  const reconcileUrl = deployId
+    ? `https://script.google.com/macros/s/${deployId}/exec`
+    : process.env.APPS_SCRIPT_RECONCILE_URL;
+
+  if (reconcileUrl) {
+    try {
+      console.log(`Triggering Apps Script reconcile for ${personName || 'unknown person'}: ${reconcileUrl}`);
+      await fetch(reconcileUrl, { method: 'POST' });
+      console.log('✅ Reconcile triggered');
+    } catch (e: any) {
+      console.error('⚠️ Failed to call Apps Script reconcile:', e.message || e);
+    }
+  } else {
+    console.log('ℹ️ No APPS_SCRIPT_RECONCILE_URL configured; reconcile not triggered.');
+  }
+}
+
 async function main() {
-  const mode = process.argv.includes('--commit') ? 'commit' : 'preview';
+  const argv = process.argv.slice(2);
+  // support: --void <id>  or --restore <id>
+  const voidIdx = argv.indexOf('--void');
+  const restoreIdx = argv.indexOf('--restore');
+  const mode = argv.includes('--commit') ? 'commit' : 'preview';
+
+  if (voidIdx !== -1 && argv[voidIdx + 1]) {
+    const txId = argv[voidIdx + 1];
+    await markTransactionStatus(txId, 'void');
+    return;
+  }
+
+  if (restoreIdx !== -1 && argv[restoreIdx + 1]) {
+    const txId = argv[restoreIdx + 1];
+    // restore to posted so it can be synced again
+    await markTransactionStatus(txId, 'posted');
+    // After restoring, trigger webhook to write row back to sheet
+    const webhookUrl = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/supabase-multi-webhook';
+    try {
+      // fetch the restored txn to build payload
+      const { data: txn, error: tErr } = await supabase.from('transactions').select('*,people(sheet_id,name)').eq('id', txId).single();
+      if (tErr) {
+        console.error('❌ Failed to fetch restored transaction:', tErr.message);
+        return;
+      }
+      const payload = {
+        table: 'transactions',
+        record: {
+          id: txn.id,
+          occurred_at: txn.occurred_at,
+          type: txn.type,
+          type_display: txn.type === 'expense' ? 'Out' : 'In',
+          amount: txn.amount,
+          cashback_share_percent: txn.cashback_share_percent,
+          cashback_share_fixed: txn.cashback_share_fixed,
+          note: txn.note,
+          metadata: {
+            ...(txn.metadata || {}),
+            person_name: (Array.isArray(txn.people) ? txn.people[0]?.name : txn.people?.name) || txn.metadata?.person_name || 'Lâm',
+            sheet_id: (Array.isArray(txn.people) ? txn.people[0]?.sheet_id : txn.people?.sheet_id) || txn.metadata?.sheet_id || '',
+            status: 'posted'
+          }
+        }
+      };
+
+      console.log(`Sending webhook to restore txn row: ${webhookUrl}`);
+      const resp = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (resp.ok) console.log('✅ Webhook sent for restored txn'); else console.error('❌ Webhook error', resp.status);
+    } catch (e: any) {
+      console.error('❌ Error sending restore webhook:', e.message || e);
+    }
+
+    return;
+  }
+
   console.log(`Running in ${mode.toUpperCase()} mode...`);
 
   // Step 1: Query sheet_id for 'Lâm'

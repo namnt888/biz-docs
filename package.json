@@ -8,6 +8,9 @@
     "watch-vault": "npm run watch-vault --prefix agent",
     "generate-pages": "npm run generate-pages --prefix agent",
     "cli": "npm run cli --prefix agent",
-    "sheet:push": "node google-sheets/push-sheet.mjs --prefix PEOPLE_SHEET_"
+    "sheet:auth": "npx @google/clasp login",
+    "sheet:push": "node google-sheets/push-sheet.mjs --prefix PEOPLE_SHEET_ --all",
+    "sheet:push:all": "node google-sheets/push-sheet.mjs --prefix PEOPLE_SHEET_ --all",
+    "sheet:push:lam": "node google-sheets/push-sheet.mjs --profile LAM --force"
   }
 }

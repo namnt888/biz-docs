@@ -6,6 +6,23 @@ id: 96194195-127f-45bb-8ec3-8fa4eb703875
 
 [👈 Trở về Dashboard](../00_Dashboard/Dashboard.md)
 
+<style>
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--border-color, #d1d5db);
+    padding: 8px 10px;
+    vertical-align: middle;
+  }
+  th {
+    background: var(--background-secondary-alt, #2b6cb0);
+    color: var(--text-normal, #fff);
+    font-weight: 700;
+  }
+</style>
+
 ## 📊 Thống kê Tài khoản
 
 ```dataviewjs
@@ -83,11 +100,22 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?account_id=eq.${ac
 
 if (res.ok) {
   const txns = await res.json();
-  dv.table(["ID", "Loại", "Kỳ", "Ngày", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
+  const statusStyles = {
+    posted: { bg: 'rgba(46,200,102,0.15)', color: '#2ec866' },
+    pending: { bg: 'rgba(244,208,63,0.12)', color: '#f4d03f' },
+    void: { bg: 'rgba(120,120,120,0.08)', color: '#6b7280' }
+  };
+
+  dv.table(["ID", "Status", "Loại", "Kỳ", "Ngày", "Số tiền", "% CB", "CB Cố định", "Σ CB", "Final Price", "Ghi chú"], txns.map(t => {
     const isPlus = ['income', 'repayment', 'refund', 'transfer_in'].includes(t.type);
     const typeLabel = isPlus ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
+    const status = (t.status || 'posted').toLowerCase();
+    const sc = statusStyles[status] || statusStyles.posted;
+    const statusBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:' + sc.bg + ';color:' + sc.color + ';font-weight:700;">' + status.toUpperCase() + '</span>';
+    const strikeStart = status === 'void' ? '<span style="text-decoration:line-through;opacity:0.6;">' : '';
+    const strikeEnd = status === 'void' ? '</span>' : '';
     const d = new Date(t.occurred_at);
-    const mStr = `${d.getFullYear()}-\ ${String(d.getMonth() + 1).padStart(2, '0')}`.replace('- ', '-');
+    const mStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     const shortId = t.id ? t.id.substring(0, 5) : '-';
     const amt = Number(t.amount);
     const cbPct = Number(t.cashback_share_percent || 0);
@@ -96,16 +124,17 @@ if (res.ok) {
     const fee = Number(t.metadata?.service_fee || 0);
     const net = amt - cbSum + fee;
     return [
-      `\`${shortId}\``,
+      shortId,
+      statusBadge,
       typeLabel,
-      `[[01_Monthly_Logs/${mStr}|${mStr}]]`,
+      '[[' + '01_Monthly_Logs/' + mStr + '|' + mStr + ']]',
       d.toLocaleDateString('vi-VN'),
-      `**${amt.toLocaleString()} đ**`,
-      cbPct > 0 ? `${(cbPct * 100).toFixed(1)}%` : '-',
-      cbFixed > 0 ? `${cbFixed.toLocaleString()} đ` : '-',
-      cbSum > 0 ? `${cbSum.toLocaleString()} đ` : '-',
-      `**${net.toLocaleString()} đ**`,
-      t.note || "-"
+      strikeStart + '**' + amt.toLocaleString() + ' đ**' + strikeEnd,
+      cbPct > 0 ? (cbPct * 100).toFixed(1) + '%' : '-',
+      cbFixed > 0 ? cbFixed.toLocaleString() + ' đ' : '-',
+      cbSum > 0 ? cbSum.toLocaleString() + ' đ' : '-',
+      strikeStart + '**' + net.toLocaleString() + ' đ**' + strikeEnd,
+      strikeStart + (t.note || '-') + strikeEnd
     ];
   }));
 }

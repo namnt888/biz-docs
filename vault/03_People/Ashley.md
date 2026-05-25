@@ -6,6 +6,23 @@ id: 61e485b2-eb71-4ec1-95a0-86c2a1609347
 
 [👈 Trở về Debt Center](../00_Dashboard/Debt_Center.md)
 
+<style>
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--border-color, #d1d5db);
+    padding: 8px 10px;
+    vertical-align: middle;
+  }
+  th {
+    background: var(--background-secondary-alt, #2b6cb0);
+    color: var(--text-normal, #fff);
+    font-weight: 700;
+  }
+</style>
+
 ## 📂 Giao dịch theo Năm
 
 - [[Ashley/2026|📅 2026]]

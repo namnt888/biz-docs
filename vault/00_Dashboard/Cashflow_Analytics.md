@@ -4,6 +4,23 @@
 
 [👈 Trở về Dashboard](Dashboard.md) | [👤 Báo cáo của tôi](My_Report.md) | [🤝 Trung tâm Công nợ](Debt_Center.md) | [🎁 Quản lý Hoàn tiền](Cashback_Center.md)
 
+<style>
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--border-color, #d1d5db);
+    padding: 8px 10px;
+    vertical-align: middle;
+  }
+  th {
+    background: var(--background-secondary-alt, #2b6cb0);
+    color: var(--text-normal, #fff);
+    font-weight: 700;
+  }
+</style>
+
 ---
 
 ## 📅 Tổng kết Dòng tiền Tháng này
@@ -54,14 +71,26 @@ try {
     }));
     
     dv.header(3, "📝 Ghi chép giao dịch gần đây");
-    dv.table(["Loại", "Thời gian", "Số tiền", "Ghi chú", "Danh mục"], txns.slice(0, 10).map(t => {
+    const statusStyles = {
+      posted: { bg: 'rgba(46,200,102,0.15)', color: '#2ec866' },
+      pending: { bg: 'rgba(244,208,63,0.12)', color: '#f4d03f' },
+      void: { bg: 'rgba(120,120,120,0.08)', color: '#6b7280' }
+    };
+
+    dv.table(["Status", "Loại", "Thời gian", "Số tiền", "Ghi chú", "Danh mục"], txns.slice(0, 10).map(t => {
       const isIn = ['income','repayment','refund','transfer_in'].includes(t.type);
       const typeLabel = isIn ? '<span style="color:#2ec866;font-weight:bold;">🟢 In</span>' : '<span style="color:#f25f5c;font-weight:bold;">🔴 Out</span>';
+      const status = (t.status || 'posted').toLowerCase();
+      const sc = statusStyles[status] || statusStyles.posted;
+      const statusBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${sc.bg};color:${sc.color};font-weight:700;">${status.toUpperCase()}</span>`;
+      const strikeStart = status === 'void' ? '<span style="text-decoration:line-through;opacity:0.6;">' : '';
+      const strikeEnd = status === 'void' ? '</span>' : '';
       return [
+        statusBadge,
         typeLabel,
         new Date(t.occurred_at).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        `**${Number(t.amount).toLocaleString()} VND**`,
-        t.note || "-",
+        `${strikeStart}**${Number(t.amount).toLocaleString()} VND**${strikeEnd}`,
+        `${strikeStart}${t.note || "-"}${strikeEnd}`,
         t.metadata?.category_name || "-"
       ];
     }));

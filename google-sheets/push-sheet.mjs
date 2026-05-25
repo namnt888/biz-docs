@@ -28,6 +28,7 @@ const scriptIdArg = getFlagValue('--script-id') || getFlagValue('--id') || args.
 const profileArg = getFlagValue('--profile') || getFlagValue('--name')
 const indexArg = getFlagValue('--index') || getFlagValue('--pick')
 const forceFlag = args.includes('--force') ? true : args.includes('--no-force') ? false : true
+const allFlag = args.includes('--all')
 
 const ask = (question) =>
   new Promise((resolve) => {
@@ -298,9 +299,8 @@ const main = async () => {
   }
 
   if (!scriptId && profiles.length) {
-    const selection = await chooseProfile(profiles)
+    const selection = allFlag ? 'ALL' : await chooseProfile(profiles)
 
-    // Handle push ALL
     if (selection === 'ALL') {
       console.log(`\nPushing to ALL ${profiles.length} profiles...\n`)
       let successCount = 0
@@ -326,13 +326,11 @@ const main = async () => {
           console.log(`[${indexLabel}] ${profile.key} ✅ PUSHED`)
           successCount++
 
-          // AUTO-DEPLOY LOGIC
           const deployEnvKey = profile.key.replace('_SCRIPT_', '_DEPLOY_')
           const deployId = process.env[deployEnvKey]
 
           if (deployId) {
             console.log(`   🚀 Auto-deploying to ${deployId}...`)
-
             const deployResult = runClasp([
               'deploy',
               '--deploymentId', deployId,
@@ -340,62 +338,19 @@ const main = async () => {
             ])
 
             if (deployResult.status === 0) {
-              const deployingTime = new Date().toLocaleString();
-              console.log(`   ✨ [${deployingTime}] Deployed Successfully!`)
+              console.log(`   ✨ [${new Date().toLocaleString()}] Deployed Successfully!`)
             } else {
               console.log(`   ⚠️ Deploy Failed (Exit Code: ${deployResult.status})`)
             }
           } else {
             console.log(`   ℹ️ No deploy ID found for ${profile.key} (Expected: ${deployEnvKey})`)
           }
-
         } else {
           console.log(`[${indexLabel}] ${profile.key} ❌ PUSH FAILED`)
-
           const emailForMessage = activeClaspEmail || expectedClaspEmail || 'your clasp account'
           console.log(`\nPush to ${profile.key} failed. This is likely a permission issue for ${emailForMessage}.`)
           console.log(`Please ensure the script ID (${profile.value}) is shared with ${emailForMessage} as Editor.`)
-
-          const loginChoice = await ask(`Would you like to run 'npx @google/clasp login' to refresh your token and retry? (y/n): `)
-
-          if (loginChoice.toLowerCase() === 'y') {
-            console.log(`\nRunning 'npx @google/clasp login'... Please refresh your session.`)
-            const loginResult = runClasp(['login'])
-
-            if (loginResult.status === 0) {
-              console.log(`Retrying push for ${profile.key}...`)
-              result = runClasp(pushArgs)
-
-              if (result.status === 0) {
-                console.log(`[${indexLabel}] ${profile.key} ✅ PUSHED (after retry)`)
-                successCount++
-                // AUTO-DEPLOY LOGIC (REPEATED FOR RETRY SUCCESS)
-                const deployEnvKey = profile.key.replace('_SCRIPT_', '_DEPLOY_')
-                const deployId = process.env[deployEnvKey]
-                if (deployId) {
-                  console.log(`   🚀 Auto-deploying to ${deployId}...`)
-                  const deployResult = runClasp([
-                    'deploy',
-                    '--deploymentId', deployId,
-                    '--description', 'Auto-updated_via_script_and_retry'
-                  ])
-                  if (deployResult.status === 0) {
-                    console.log(`   ✨ [${new Date().toLocaleString()}] Deployed Successfully!`)
-                  } else {
-                    console.log(`   ⚠️ Deploy Failed (Exit Code: ${deployResult.status})`)
-                  }
-                }
-              } else {
-                console.log(`[${indexLabel}] ${profile.key} ❌ RETRY FAILED`)
-                failCount++
-              }
-            } else {
-              console.log(`\n⚠️ Login failed or cancelled. Skipping ${profile.key}.`)
-              failCount++
-            }
-          } else {
-            failCount++
-          }
+          failCount++
         }
       }
 
